@@ -17,7 +17,6 @@ modpack/resourcepacks/grimoire_assets/data/grimoiremod/structures/**/*.nbt
 modpack/mods/*.jar
 !modpack/mods/.gitkeep
 
-modpack/manifest.json
 
 launcher/build/
 launcher/dist/

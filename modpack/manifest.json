@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.267",
+  "files": [
+    {
+      "path": "mods/grimoiremod-1.0.0.jar",
+      "sha256": "20e57e3d63777f77a362bfc312ba388425497c300dd63f05f4a225efc143f5ab",
+      "size": 155256,
+      "url": "https://raw.githubusercontent.com/Lapisstud/ModPack/test/modpack/mods/grimoiremod-1.0.0.jar"
+    },
+    {
+      "path": "resourcepacks/grimoire_assets/pack.mcmeta",
+      "sha256": "8c34394adff4d474f5ab975d9f767f552cd7c2befad83874d547baec912603ad",
+      "size": 115,
+      "url": "https://raw.githubusercontent.com/Lapisstud/ModPack/test/modpack/resourcepacks/grimoire_assets/pack.mcmeta"
+    }
+  ]
+}
