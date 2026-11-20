@@ -1,0 +1,20 @@
+# Normalize line endings: LF in repo, native on checkout
+* text=auto eol=lf
+
+# Shell scripts — строго LF (иначе bash ругается на Windows)
+*.sh   text eol=lf
+*.bash text eol=lf
+
+# Windows batch — CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Binary files — не трогать
+*.jar  binary
+*.png  binary
+*.ogg  binary
+*.mp3  binary
+*.wav  binary
+*.bbmodel binary
+*.nbt  binary
+*.litematic binary

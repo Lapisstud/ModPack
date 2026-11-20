@@ -1,0 +1,1608 @@
+
+=================== PROJECT STRUCTURE ===================
+./.gitignore
+./AI_CONTEXT.md
+./build.gradle
+./d.txt
+./gradle.properties
+./gradle/wrapper/gradle-wrapper.properties
+./README.md
+./settings.gradle
+./src/main/java/com/example/grimoiremod/block/GlyphWorkbenchBlock.java
+./src/main/java/com/example/grimoiremod/client/ClientEvents.java
+./src/main/java/com/example/grimoiremod/client/ClientGlyphIcons.java
+./src/main/java/com/example/grimoiremod/client/ClientModEvents.java
+./src/main/java/com/example/grimoiremod/client/GlyphTooltip.java
+./src/main/java/com/example/grimoiremod/client/GlyphWorkbenchScreen.java
+./src/main/java/com/example/grimoiremod/client/GrimoireScreen.java
+./src/main/java/com/example/grimoiremod/client/KeyBindings.java
+./src/main/java/com/example/grimoiremod/client/SkillTreeScreen.java
+./src/main/java/com/example/grimoiremod/client/SpellProjectileRenderer.java
+./src/main/java/com/example/grimoiremod/data/GlyphInstance.java
+./src/main/java/com/example/grimoiremod/data/GlyphPage.java
+./src/main/java/com/example/grimoiremod/data/GrimoireData.java
+./src/main/java/com/example/grimoiremod/data/SkillTreeData.java
+./src/main/java/com/example/grimoiremod/data/SkillTreeDef.java
+./src/main/java/com/example/grimoiremod/data/SpellDescriber.java
+./src/main/java/com/example/grimoiremod/data/SpellParser.java
+./src/main/java/com/example/grimoiremod/entity/SpellProjectile.java
+./src/main/java/com/example/grimoiremod/glyphs/Glyph.java
+./src/main/java/com/example/grimoiremod/glyphs/GlyphBalance.java
+./src/main/java/com/example/grimoiremod/glyphs/GlyphCategory.java
+./src/main/java/com/example/grimoiremod/glyphs/Glyphs.java
+./src/main/java/com/example/grimoiremod/glyphs/GrimoireEffects.java
+./src/main/java/com/example/grimoiremod/glyphs/Phase.java
+./src/main/java/com/example/grimoiremod/glyphs/SpellAggregator.java
+./src/main/java/com/example/grimoiremod/glyphs/Stat.java
+./src/main/java/com/example/grimoiremod/glyphs/StatBlock.java
+./src/main/java/com/example/grimoiremod/glyphs/StatMod.java
+./src/main/java/com/example/grimoiremod/glyphs/WetEffect.java
+./src/main/java/com/example/grimoiremod/GrimoireCommand.java
+./src/main/java/com/example/grimoiremod/GrimoireMod.java
+./src/main/java/com/example/grimoiremod/item/CreativeGrimoireItem.java
+./src/main/java/com/example/grimoiremod/item/GrimoireItem.java
+./src/main/java/com/example/grimoiremod/menu/GlyphWorkbenchMenu.java
+./src/main/java/com/example/grimoiremod/ModEvents.java
+./src/main/java/com/example/grimoiremod/network/AllocatePointPacket.java
+./src/main/java/com/example/grimoiremod/network/GrimoireActionPacket.java
+./src/main/java/com/example/grimoiremod/network/LevelUpSkillNodePacket.java
+./src/main/java/com/example/grimoiremod/network/ModNetwork.java
+./src/main/java/com/example/grimoiremod/network/UnlockSkillNodePacket.java
+./src/main/java/com/example/grimoiremod/util/GrimoireLocator.java
+./src/main/resources/assets/grimoiremod/lang/en_us.json
+./src/main/resources/assets/grimoiremod/lang/ru_ru.json
+./src/main/resources/assets/grimoiremod/models/item/creative_grimoire.json
+./src/main/resources/assets/grimoiremod/models/item/grimoire.json
+./src/main/resources/META-INF/neoforge.mods.toml
+./src/main/resources/pack.mcmeta
+
+=================== GRADLE / CONFIG ===================
+
+----- build.gradle -----
+plugins {
+    id 'java'
+    id 'net.neoforged.gradle.userdev' version '7.1.21'
+}
+
+version = '1.0.0'
+group = 'com.example.grimoiremod'
+base { archivesName = 'grimoiremod' }
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+runs {
+    client {
+        systemProperty 'neoforge.enabledGameTestNamespaces', 'grimoiremod'
+        // Явно задаём ignoreList для BootstrapLauncher
+        systemProperties.put('ignoreList',
+            'bootstraplauncher,securejarhandler,asm-commons,asm-util,asm-analysis,asm-tree,asm,JarJarFileSystems,client-extra,fmlcore,javafmllanguage')
+    }
+    server {
+        systemProperty 'neoforge.enabledGameTestNamespaces', 'grimoiremod'
+        systemProperties.put('ignoreList',
+            'bootstraplauncher,securejarhandler,asm-commons,asm-util,asm-analysis,asm-tree,asm,JarJarFileSystems,client-extra,fmlcore,javafmllanguage')
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url = 'https://neoforged.forgecdn.net/releases' } // Зеркало NeoForged
+    maven { url = 'https://repo.spongepowered.org/repository/forge-proxy/' } // Для groovydslimprover
+    maven { url = 'https://maven.neoforged.net/releases' } // Официальный (на случай, если заработает)
+}
+
+dependencies {
+    implementation "net.neoforged:neoforge:21.1.218"
+}
+
+['compileClasspath', 'runtimeClasspath', 'testCompileClasspath', 'testRuntimeClasspath'].each { configName ->
+    configurations.named(configName) {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.ow2.asm') {
+                details.useVersion '9.8'
+            }
+        }
+    }
+}
+----- settings.gradle -----
+pluginManagement {
+    repositories {
+        mavenLocal()
+        gradlePluginPortal()
+        maven { url = 'https://maven.neoforged.net/releases' }
+    }
+}
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+rootProject.name = 'grimoiremod'
+
+----- gradle.properties -----
+org.gradle.jvmargs=-Xmx2G
+
+----- gradle/wrapper/gradle-wrapper.properties -----
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.4-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+
+=================== RESOURCES (без ассет-мусора; lang keep=en_us ru_ru) ===================
+
+----- src/main/resources/assets/grimoiremod/lang/en_us.json -----
+{
+  "item.grimoiremod.grimoire": "Grimoire",
+  "block.grimoiremod.glyph_workbench": "Glyph Workbench",
+  "item.grimoiremod.glyph_workbench": "Glyph Workbench",
+  "item.grimoiremod.creative_grimoire": "Creative Grimoire",
+
+  "key.grimoiremod.prev": "Previous Spell",
+  "key.grimoiremod.next": "Next Spell",
+  "key.grimoiremod.skill_tree": "Open Skill Tree",
+  "key.categories.grimoiremod": "Grimoire",
+
+  "effect.grimoiremod.wet": "Wet",
+
+  "gui.grimoiremod.grimoire": "Grimoire",
+  "gui.grimoiremod.workbench": "Glyph Workbench",
+  "gui.grimoiremod.toc": "Table of Contents",
+  "gui.grimoiremod.toc_short": "TOC",
+  "gui.grimoiremod.bank": "Glyph Bank",
+  "gui.grimoiremod.bank_prefix": "[Bank] ",
+  "gui.grimoiremod.spell": "Spell %s",
+  "gui.grimoiremod.result": "Result:",
+  "gui.grimoiremod.no_form": "(no form)",
+  "gui.grimoiremod.no_glyphs": "No glyphs of this type",
+  "gui.grimoiremod.select_glyph": "Select a glyph",
+  "gui.grimoiremod.reset": "Reset",
+  "gui.grimoiremod.points": "Points: %s",
+  "gui.grimoiremod.points_spent": "  Points spent: %s",
+  "gui.grimoiremod.no_stats": "  (no stats)",
+  "gui.grimoiremod.grimoire_not_found": "Grimoire not found!",
+  "gui.grimoiremod.right_click_remove": "%s (RMB - remove)",
+  "gui.grimoiremod.advanced": "[Advanced] %s",
+  "gui.grimoiremod.orphan_modifier": "WARNING: Modifier without element",
+  "gui.grimoiremod.need_grimoire": "Grimoire required!",
+  "gui.grimoiremod.drag_hint": "Hold and drag to move",
+  "gui.grimoiremod.drop_hint": "Release to drop",
+  "gui.grimoiremod.name": "Name",
+  "gui.grimoiremod.errors": "Errors:",
+
+  "gui.grimoiremod.damage": "%s damage",
+  "gui.grimoiremod.heal": "+%s heal",
+  "gui.grimoiremod.form": "Form: %s",
+  "gui.grimoiremod.crit_chance": "Crit chance: +%s%%",
+  "gui.grimoiremod.crit_damage": "Crit damage: +%s%%",
+  "gui.grimoiremod.cooldown": "Cooldown: %ss",
+
+  "gui.grimoiremod.tab.all": "All",
+  "gui.grimoiremod.tab.forms": "Forms",
+  "gui.grimoiremod.tab.elements": "Elements",
+  "gui.grimoiremod.tab.effects": "Effects",
+  "gui.grimoiremod.tab.modifiers": "Modifiers",
+  "gui.grimoiremod.tab.form_mods": "Form Mods",
+  "gui.grimoiremod.tab.all_short": "All",
+  "gui.grimoiremod.tab.forms_short": "Fm",
+  "gui.grimoiremod.tab.elements_short": "El",
+  "gui.grimoiremod.tab.effects_short": "Ef",
+  "gui.grimoiremod.tab.modifiers_short": "Md",
+  "gui.grimoiremod.tab.form_mods_short": "F+",
+
+  "gui.grimoiremod.error.no_form": "No form",
+  "gui.grimoiremod.error.multiple_forms": "Multiple forms (only first used)",
+  "gui.grimoiremod.error.multiple_elements": "Multiple elements (only first used)",
+  "gui.grimoiremod.error.duplicate_effect": "Duplicate effect (ignored)",
+  "gui.grimoiremod.error.orphan_modifier": "Modifier without an anchor",
+
+  "glyph.grimoiremod.projectile": "Projectile",
+  "glyph.grimoiremod.self": "Self",
+  "glyph.grimoiremod.touch": "Touch",
+  "glyph.grimoiremod.fire": "Fire",
+  "glyph.grimoiremod.ice": "Ice",
+  "glyph.grimoiremod.water": "Water",
+  "glyph.grimoiremod.heal": "Heal",
+  "glyph.grimoiremod.speed": "Speed",
+  "glyph.grimoiremod.slow": "Slow",
+  "glyph.grimoiremod.bigger": "Bigger",
+  "glyph.grimoiremod.split": "Split",
+  "glyph.grimoiremod.focus": "Focus",
+  "glyph.grimoiremod.spread": "Spread",
+  "glyph.grimoiremod.fireball": "Fireball",
+
+  "stat.grimoiremod.fallback_damage": "Damage",
+  "stat.grimoiremod.crit_chance": "Crit Chance",
+  "stat.grimoiremod.crit_mult": "Crit Damage",
+  "stat.grimoiremod.cooldown": "Cooldown",
+  "stat.grimoiremod.count": "Count",
+  "stat.grimoiremod.angle": "Angle",
+  "stat.grimoiremod.life": "Range",
+  "stat.grimoiremod.damage_bonus": "Damage Bonus",
+  "stat.grimoiremod.damage": "Damage",
+  "stat.grimoiremod.heal": "Heal",
+  "stat.grimoiremod.duration": "Duration",
+
+  "gui.grimoiremod.skill_tree.title": "Skill Tree",
+  "gui.grimoiremod.skill_tree.main": "Path of the Grimoire",
+  "gui.grimoiremod.skill_tree.general": "General",
+  "gui.grimoiremod.skill_tree.points": "Mastery Points: %s",
+  "gui.grimoiremod.skill_tree.unlock": "LMB: Unlock (%s points)",
+  "gui.grimoiremod.skill_tree.unlocked": "Unlocked",
+  "gui.grimoiremod.skill_tree.no_points": "Not enough points",
+  "gui.grimoiremod.skill_tree.cost": "Cost: %s point(s)",
+  "gui.grimoiremod.skill_tree.soon": "Coming soon...",
+  "gui.grimoiremod.skill_tree.requires_grimoire": "Grimoire required",
+  "gui.grimoiremod.skill_tree.requires_node": "Requires: %s",
+  "gui.grimoiremod.skill_tree.level": "Level: %s / %s",
+  "gui.grimoiremod.skill_tree.exp": "Progress: %s%%",
+  "gui.grimoiremod.skill_tree.level_up": "RMB: Level Up (1 point)",
+  "gui.grimoiremod.skill_tree.max_level": "Max Level Reached",
+
+  "gui.grimoiremod.skill.magic_basics": "Basics of Magic",
+  "gui.grimoiremod.skill.root": "Path of the Grimoire",
+  "gui.grimoiremod.skill.mastery_elements": "Mastery of Elements",
+  "gui.grimoiremod.skill.elem.fire": "Fire",
+  "gui.grimoiremod.skill.elem.ice": "Ice",
+  "gui.grimoiremod.skill.elem.water": "Water",
+  "gui.grimoiremod.skill.elem.lightning": "Lightning",
+  "gui.grimoiremod.skill.elem.nature": "Nature",
+  "gui.grimoiremod.skill.mastery_combat": "Mastery of Combat",
+  "gui.grimoiremod.skill.combat.damage": "Damage",
+  "gui.grimoiremod.skill.combat.radius": "Area of Effect",
+  "gui.grimoiremod.skill.mastery_support": "Mastery of Support",
+  "gui.grimoiremod.skill.support.heal": "Healing",
+  "gui.grimoiremod.skill.mastery_utility": "Mastery of Utility",
+  "gui.grimoiremod.skill.utility.cooldown": "Cooldown Reduction",
+
+  "gui.grimoiremod.action.page": "Page %s",
+  "gui.grimoiremod.action.toc": "Table of Contents",
+  "gui.grimoiremod.action.spell": "Spell %s",
+  "gui.grimoiremod.action.spell_named": "Spell %s: %s",
+
+  "gui.grimoiremod.command.grimoire_removed": "Grimoire removed.",
+  "gui.grimoiremod.command.grimoire_not_found": "Grimoire not found.",
+  "gui.grimoiremod.command.need_grimoire_in_hand": "No grimoire in hand.",
+  "gui.grimoiremod.command.mastery_added": "+%s mastery points. Total: %s"
+}
+
+----- src/main/resources/assets/grimoiremod/lang/ru_ru.json -----
+{
+  "item.grimoiremod.grimoire": "Гримуар",
+  "block.grimoiremod.glyph_workbench": "Верстак глифов",
+  "item.grimoiremod.glyph_workbench": "Верстак глифов",
+  "item.grimoiremod.creative_grimoire": "Творческий гримуар",
+
+  "key.grimoiremod.prev": "Предыдущее заклинание",
+  "key.grimoiremod.next": "Следующее заклинание",
+  "key.grimoiremod.skill_tree": "Открыть дерево навыков",
+  "key.categories.grimoiremod": "Гримуар",
+
+  "effect.grimoiremod.wet": "Влажный",
+
+  "gui.grimoiremod.grimoire": "Гримуар",
+  "gui.grimoiremod.workbench": "Верстак глифов",
+  "gui.grimoiremod.toc": "Оглавление",
+  "gui.grimoiremod.toc_short": "Огл",
+  "gui.grimoiremod.bank": "Банк глифов",
+  "gui.grimoiremod.bank_prefix": "[Банк] ",
+  "gui.grimoiremod.spell": "Заклинание %s",
+  "gui.grimoiremod.result": "Итог:",
+  "gui.grimoiremod.no_form": "(нет способа)",
+  "gui.grimoiremod.no_glyphs": "Нет глифов этого типа",
+  "gui.grimoiremod.select_glyph": "Выберите глиф",
+  "gui.grimoiremod.reset": "Сбросить",
+  "gui.grimoiremod.points": "Очки: %s",
+  "gui.grimoiremod.points_spent": "  Вложено очков: %s",
+  "gui.grimoiremod.no_stats": "  (нет статов)",
+  "gui.grimoiremod.grimoire_not_found": "Гримуар не найден!",
+  "gui.grimoiremod.right_click_remove": "%s (ПКМ - убрать)",
+  "gui.grimoiremod.advanced": "[Развитый] %s",
+  "gui.grimoiremod.orphan_modifier": "⚠ Модификатор без элемента",
+  "gui.grimoiremod.need_grimoire": "Требуется гримуар!",
+  "gui.grimoiremod.drag_hint": "Зажми и перетащи",
+  "gui.grimoiremod.drop_hint": "Отпусти для сброса",
+  "gui.grimoiremod.name": "Название",
+  "gui.grimoiremod.errors": "Ошибки:",
+
+  "gui.grimoiremod.damage": "%s урона",
+  "gui.grimoiremod.heal": "+%s лечения",
+  "gui.grimoiremod.form": "Форма: %s",
+  "gui.grimoiremod.crit_chance": "Шанс крита: +%s%%",
+  "gui.grimoiremod.crit_damage": "Урон крита: +%s%%",
+  "gui.grimoiremod.cooldown": "Перезарядка: %sс",
+
+  "gui.grimoiremod.tab.all": "Все",
+  "gui.grimoiremod.tab.forms": "Формы",
+  "gui.grimoiremod.tab.elements": "Стихии",
+  "gui.grimoiremod.tab.effects": "Эффекты",
+  "gui.grimoiremod.tab.modifiers": "Модификаторы",
+  "gui.grimoiremod.tab.form_mods": "Моды форм",
+  "gui.grimoiremod.tab.all_short": "Все",
+  "gui.grimoiremod.tab.forms_short": "Фм",
+  "gui.grimoiremod.tab.elements_short": "Ст",
+  "gui.grimoiremod.tab.effects_short": "Эф",
+  "gui.grimoiremod.tab.modifiers_short": "Мд",
+  "gui.grimoiremod.tab.form_mods_short": "Ф+",
+
+  "gui.grimoiremod.error.no_form": "Нет формы",
+  "gui.grimoiremod.error.multiple_forms": "Несколько форм (используется первая)",
+  "gui.grimoiremod.error.multiple_elements": "Несколько стихий (используется первая)",
+  "gui.grimoiremod.error.duplicate_effect": "Дубликат эффекта (игнорируется)",
+  "gui.grimoiremod.error.orphan_modifier": "Модификатор без привязки",
+
+  "glyph.grimoiremod.projectile": "Снаряд",
+  "glyph.grimoiremod.self": "На себя",
+  "glyph.grimoiremod.touch": "Касание",
+  "glyph.grimoiremod.fire": "Огонь",
+  "glyph.grimoiremod.ice": "Лёд",
+  "glyph.grimoiremod.water": "Вода",
+  "glyph.grimoiremod.heal": "Лечение",
+  "glyph.grimoiremod.speed": "Скорость",
+  "glyph.grimoiremod.slow": "Замедление",
+  "glyph.grimoiremod.bigger": "Увеличение",
+  "glyph.grimoiremod.split": "Разделение",
+  "glyph.grimoiremod.focus": "Фокус",
+  "glyph.grimoiremod.spread": "Разброс",
+  "glyph.grimoiremod.fireball": "Огненный шар",
+
+  "stat.grimoiremod.fallback_damage": "Урон",
+  "stat.grimoiremod.crit_chance": "Шанс крита",
+  "stat.grimoiremod.crit_mult": "Урон крита",
+  "stat.grimoiremod.cooldown": "Перезарядка",
+  "stat.grimoiremod.count": "Количество",
+  "stat.grimoiremod.angle": "Угол",
+  "stat.grimoiremod.life": "Дальность",
+  "stat.grimoiremod.damage_bonus": "Бонус к урону",
+  "stat.grimoiremod.damage": "Урон",
+  "stat.grimoiremod.heal": "Лечение",
+  "stat.grimoiremod.duration": "Длительность",
+
+  "gui.grimoiremod.skill_tree.title": "Дерево навыков",
+  "gui.grimoiremod.skill_tree.main": "Путь Гримуара",
+  "gui.grimoiremod.skill_tree.general": "Общее",
+  "gui.grimoiremod.skill_tree.points": "Очки мастерства: %s",
+  "gui.grimoiremod.skill_tree.unlock": "ЛКМ: Изучить (%s оч.)",
+  "gui.grimoiremod.skill_tree.unlocked": "Изучено",
+  "gui.grimoiremod.skill_tree.no_points": "Недостаточно очков",
+  "gui.grimoiremod.skill_tree.cost": "Стоимость: %s оч.",
+  "gui.grimoiremod.skill_tree.soon": "Скоро...",
+  "gui.grimoiremod.skill_tree.requires_grimoire": "Требуется гримуар",
+  "gui.grimoiremod.skill_tree.requires_node": "Требуется: %s",
+  "gui.grimoiremod.skill_tree.level": "Уровень: %s / %s",
+  "gui.grimoiremod.skill_tree.exp": "Прогресс: %s%%",
+  "gui.grimoiremod.skill_tree.level_up": "ПКМ: Повысить уровень (1 оч.)",
+  "gui.grimoiremod.skill_tree.max_level": "Максимальный уровень",
+
+  "gui.grimoiremod.skill.magic_basics": "Основы магии",
+  "gui.grimoiremod.skill.root": "Путь Гримуара",
+  "gui.grimoiremod.skill.mastery_elements": "Мастерство стихий",
+  "gui.grimoiremod.skill.elem.fire": "Огонь",
+  "gui.grimoiremod.skill.elem.ice": "Лёд",
+  "gui.grimoiremod.skill.elem.water": "Вода",
+  "gui.grimoiremod.skill.elem.lightning": "Молния",
+  "gui.grimoiremod.skill.elem.nature": "Природа",
+  "gui.grimoiremod.skill.mastery_combat": "Мастерство боя",
+  "gui.grimoiremod.skill.combat.damage": "Урон",
+  "gui.grimoiremod.skill.combat.radius": "Радиус поражения",
+  "gui.grimoiremod.skill.mastery_support": "Мастерство поддержки",
+  "gui.grimoiremod.skill.support.heal": "Лечение",
+  "gui.grimoiremod.skill.mastery_utility": "Мастерство утилит",
+  "gui.grimoiremod.skill.utility.cooldown": "Перезарядка",
+
+  "gui.grimoiremod.action.page": "Страница %s",
+  "gui.grimoiremod.action.toc": "Оглавление",
+  "gui.grimoiremod.action.spell": "Заклинание %s",
+  "gui.grimoiremod.action.spell_named": "Заклинание %s: %s",
+
+  "gui.grimoiremod.command.grimoire_removed": "Гримуар удалён.",
+  "gui.grimoiremod.command.grimoire_not_found": "Гримуар не найден.",
+  "gui.grimoiremod.command.need_grimoire_in_hand": "В руке нет гримуара.",
+  "gui.grimoiremod.command.mastery_added": "+%s очков мастерства. Всего: %s"
+}
+
+----- src/main/resources/META-INF/neoforge.mods.toml -----
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="grimoiremod"
+version="1.0.0"
+displayName="Grimoire Mod"
+description="Adds the Grimoire item with a spell system."
+
+[[dependencies.grimoiremod]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.1.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.grimoiremod]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.1]"
+    ordering="NONE"
+    side="BOTH"
+
+----- src/main/resources/pack.mcmeta -----
+{
+  "pack": {
+    "description": "grimoiremod resources",
+    "pack_format": 34
+  }
+}
+
+=================== JAVA SOURCES (src) ===================
+
+----- src/main/java/com/example/grimoiremod/block/GlyphWorkbenchBlock.java -----
+package com.example.grimoiremod.block;
+
+import com.example.grimoiremod.data.GlyphPage;
+import com.example.grimoiremod.data.GrimoireData;
+import com.example.grimoiremod.item.GrimoireItem;
+import com.example.grimoiremod.menu.GlyphWorkbenchMenu;
+import com.example.grimoiremod.util.GrimoireLocator;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+
+public class GlyphWorkbenchBlock extends Block {
+    public GlyphWorkbenchBlock(Properties props) {
+        super(props);
+    }
+
+    public static BlockBehaviour.Properties defaultProps() {
+        return BlockBehaviour.Properties.of()
+                .strength(2.5F)
+                .sound(SoundType.WOOD);
+    }
+
+    @Override
+    public InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+        if (!level.isClientSide) {
+            int slot = GrimoireLocator.findFirst(player);
+            if (slot < 0) {
+                player.displayClientMessage(Component.translatable("gui.grimoiremod.need_grimoire"), true);
+                return InteractionResult.CONSUME;
+            }
+
+            // Фикс: если открыто оглавление, переключаем на первое заклинание
+            ItemStack stack = player.getInventory().getItem(slot);
+            if (stack.getItem() instanceof GrimoireItem) {
+                int active = GrimoireData.getActivePage(stack);
+                GlyphPage page = GrimoireData.getPage(stack, active);
+                if (page == null || page.isToc()) {
+                    GrimoireData.switchPage(stack, true);
+                }
+            }
+
+            MenuProvider provider = new SimpleMenuProvider(
+                    (id, inv, p) -> new GlyphWorkbenchMenu(id, inv, slot),
+                    Component.translatable("gui.grimoiremod.workbench")
+            );
+            ((ServerPlayer) player).openMenu(provider, buf -> buf.writeVarInt(slot));
+        }
+        return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/client/ClientEvents.java -----
+package com.example.grimoiremod.client;
+
+import com.example.grimoiremod.GrimoireMod;
+import com.example.grimoiremod.item.GrimoireItem;
+import com.example.grimoiremod.network.GrimoireActionPacket;
+import com.example.grimoiremod.util.GrimoireLocator;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
+
+@EventBusSubscriber(modid = GrimoireMod.MOD_ID, value = Dist.CLIENT)
+public class ClientEvents {
+
+    @SubscribeEvent
+    public static void onClientTick(ClientTickEvent.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        Player player = mc.player;
+        if (player == null) return;
+
+        if (mc.screen instanceof GrimoireScreen gs && gs.isNameFieldFocused()) {
+            while (KeyBindings.PREV_SPELL.consumeClick()) { }
+            while (KeyBindings.NEXT_SPELL.consumeClick()) { }
+            while (KeyBindings.SKILL_TREE.consumeClick()) { }
+            return;
+        }
+
+        while (KeyBindings.PREV_SPELL.consumeClick()) switchPage(player, false);
+        while (KeyBindings.NEXT_SPELL.consumeClick()) switchPage(player, true);
+        while (KeyBindings.SKILL_TREE.consumeClick()) openSkillTree(player);
+    }
+
+    private static void switchPage(Player player, boolean next) {
+        Minecraft mc = Minecraft.getInstance();
+        int slot;
+        if (mc.screen instanceof GrimoireScreen gs) {
+            slot = gs.getSlotId();
+        } else {
+            slot = GrimoireLocator.findFirst(player);
+            if (slot < 0) return;
+        }
+        ItemStack stack = player.getInventory().getItem(slot);
+        if (!(stack.getItem() instanceof GrimoireItem)) return;
+        PacketDistributor.sendToServer(GrimoireActionPacket.switchPage(slot, next));
+    }
+
+    private static void openSkillTree(Player player) {
+        Minecraft mc = Minecraft.getInstance();
+        int slot;
+        if (mc.screen instanceof GrimoireScreen gs) slot = gs.getSlotId();
+        else slot = GrimoireLocator.findFirst(player);
+        
+        // Теперь открывается всегда, даже если гримуара нет (slot = -1)
+        mc.setScreen(new SkillTreeScreen(slot));
+    }
+
+    @SubscribeEvent
+    public static void onScreenInit(ScreenEvent.Init.Post event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return;
+        int slot = GrimoireLocator.findFirst(mc.player);
+        if (slot < 0) return;
+
+        if (event.getScreen() instanceof InventoryScreen inv) {
+            int guiLeft = (inv.width - 176) / 2;
+            int guiTop = (inv.height - 166) / 2;
+            int x = Math.max(4, guiLeft - 64);
+            int y = guiTop + 4;
+            event.addListener(Button.builder(
+                    Component.translatable("gui.grimoiremod.grimoire"),
+                    b -> mc.setScreen(new GrimoireScreen(slot))
+            ).pos(x, y).size(60, 20).build());
+            return;
+        }
+
+        if (event.getScreen() instanceof CreativeModeInventoryScreen) {
+            event.addListener(Button.builder(
+                    Component.translatable("gui.grimoiremod.grimoire"),
+                    b -> mc.setScreen(new GrimoireScreen(slot))
+            ).pos(4, 4).size(60, 20).build());
+        }
+    }
+
+    public static int findGrimoireSlot(Player player) {
+        return GrimoireLocator.findFirst(player);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/client/ClientGlyphIcons.java -----
+package com.example.grimoiremod.client;
+
+import com.example.grimoiremod.GrimoireMod;
+import com.example.grimoiremod.glyphs.Glyph;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
+import net.minecraft.util.profiling.ProfilerFiller;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public final class ClientGlyphIcons {
+    private static final Map<String, Boolean> CACHE = new HashMap<>();
+
+    private ClientGlyphIcons() {}
+
+    public static void clearCache() { CACHE.clear(); }
+
+    public static boolean has(String glyphId) {
+        if (glyphId == null || glyphId.isEmpty()) return false;
+        return CACHE.computeIfAbsent(glyphId, k -> {
+            try {
+                var mc = Minecraft.getInstance();
+                if (mc.getResourceManager() == null) return false;
+                return mc.getResourceManager().getResource(path(k)).isPresent();
+            } catch (Exception e) {
+                return false;
+            }
+        });
+    }
+
+    public static ResourceLocation path(String glyphId) {
+        return ResourceLocation.fromNamespaceAndPath(GrimoireMod.MOD_ID,
+                "textures/gui/glyph/" + glyphId + ".png");
+    }
+
+    public static void draw(GuiGraphics gfx, Font font, Glyph g, int x, int y, int size) {
+        int cx = x + (size - 16) / 2;
+        int cy = y + (size - 16) / 2;
+        if (has(g.id())) {
+            gfx.blit(path(g.id()), cx, cy, 0, 0, 16, 16, 16, 16);
+        } else {
+            gfx.fill(cx, cy, cx + 16, cy + 16, g.color());
+            String initial = g.getDisplayName().getString().substring(0, 1).toUpperCase();
+            gfx.drawString(font, initial, cx + 8 - font.width(initial) / 2, cy + 4, 0xFFFFFFFF, false);
+        }
+    }
+
+    @EventBusSubscriber(modid = GrimoireMod.MOD_ID, value = Dist.CLIENT)
+    public static class ReloadListener {
+        @SubscribeEvent
+        public static void onRegisterReloadListeners(RegisterClientReloadListenersEvent event) {
+            event.registerReloadListener(
+                new SimplePreparableReloadListener<Void>() {
+                    @Override
+                    protected Void prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
+                        return null;
+                    }
+                    @Override
+                    protected void apply(Void object, ResourceManager resourceManager, ProfilerFiller profiler) {
+                        clearCache();
+                    }
+                }
+            );
+        }
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/client/ClientModEvents.java -----
+package com.example.grimoiremod.client;
+
+import com.example.grimoiremod.GrimoireMod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
+import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+
+@EventBusSubscriber(modid = GrimoireMod.MOD_ID, value = Dist.CLIENT)
+public class ClientModEvents {
+
+    @SubscribeEvent
+    public static void onRegisterKeys(RegisterKeyMappingsEvent event) {
+        event.register(KeyBindings.PREV_SPELL);
+        event.register(KeyBindings.NEXT_SPELL);
+        event.register(KeyBindings.SKILL_TREE);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerEntityRenderer(GrimoireMod.SPELL_PROJECTILE.get(), SpellProjectileRenderer::new);
+    }
+
+    @SubscribeEvent
+    public static void onRegisterScreens(RegisterMenuScreensEvent event) {
+        event.register(GrimoireMod.GLYPH_WORKBENCH_MENU.get(), GlyphWorkbenchScreen::new);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/client/GlyphTooltip.java -----
+package com.example.grimoiremod.client;
+
+import com.example.grimoiremod.data.GlyphInstance;
+import com.example.grimoiremod.glyphs.Glyph;
+import com.example.grimoiremod.glyphs.Glyphs;
+import com.example.grimoiremod.glyphs.Phase;
+import com.example.grimoiremod.glyphs.Stat;
+import com.example.grimoiremod.glyphs.StatMod;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public final class GlyphTooltip {
+    private GlyphTooltip() {}
+
+    public static List<Component> build(GlyphInstance inst, String errKey) {
+        List<Component> tooltip = new ArrayList<>();
+        if (inst == null) return tooltip;
+        Glyph g = Glyphs.byId(inst.typeId());
+        if (g == null) return tooltip;
+
+        tooltip.add(Component.literal(". ").withStyle(s -> s.withColor(g.color() & 0xFFFFFF))
+                .append(g.getDisplayName().copy().withStyle(ChatFormatting.WHITE)));
+        if (inst.totalPoints() > 0) {
+            tooltip.add(Component.translatable("gui.grimoiremod.points_spent", inst.totalPoints())
+                    .withStyle(ChatFormatting.GOLD));
+        }
+        
+        for (StatMod sm : g.stats()) {
+            if (sm.phase() == Phase.BASE) {
+                double val = sm.value();
+                int pts = inst.getPoints(sm.stat());
+                
+                // Применяем вложенные очки
+                if (sm.stat() == Stat.COOLDOWN) {
+                    val = Math.max(0.1, val - pts * 0.05);
+                } else {
+                    val += pts;
+                }
+                
+                tooltip.add(Component.literal("  ").append(
+                        Component.empty()
+                                .append(sm.stat().getDisplayName())
+                                .append(": " + sm.stat().format(val, sm.phase()))
+                ).withStyle(ChatFormatting.GRAY));
+            } else {
+                tooltip.add(Component.literal("  ").append(sm.tooltip()).withStyle(ChatFormatting.GRAY));
+            }
+        }
+        
+        if (g.stats().isEmpty()) {
+            tooltip.add(Component.translatable("gui.grimoiremod.no_stats").withStyle(ChatFormatting.DARK_GRAY));
+        }
+        if (errKey != null) {
+            tooltip.add(Component.literal("  ").append(Component.translatable(errKey))
+                    .withStyle(ChatFormatting.RED));
+        }
+        return tooltip;
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/client/GlyphWorkbenchScreen.java -----
+package com.example.grimoiremod.client;
+
+import com.example.grimoiremod.data.GlyphInstance;
+import com.example.grimoiremod.data.GlyphPage;
+import com.example.grimoiremod.data.GrimoireData;
+import com.example.grimoiremod.data.SpellParser;
+import com.example.grimoiremod.glyphs.Glyph;
+import com.example.grimoiremod.glyphs.Glyphs;
+import com.example.grimoiremod.glyphs.Stat;
+import com.example.grimoiremod.item.GrimoireItem;
+import com.example.grimoiremod.menu.GlyphWorkbenchMenu;
+import com.example.grimoiremod.network.AllocatePointPacket;
+import com.example.grimoiremod.network.GrimoireActionPacket;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.PacketDistributor;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+public class GlyphWorkbenchScreen extends AbstractContainerScreen<GlyphWorkbenchMenu> {
+    private final int grimoireSlot;
+    private int selectedSlot = -1;
+    private GlyphInstance selectedBankInst = null;
+    private int bankScroll = 0;
+
+    private static final int BUTTON_W = 14;
+    private static final int BUTTON_H = 12;
+    private static final int BANK_COLS = 7;
+    private static final int BANK_ROWS_VISIBLE = 3;
+    private static final int CELL_SIZE = 18;
+    private static final int GAP = 2;
+    private static final int SLOT_SIZE = 24;
+    private static final int SLOT_GAP = 6;
+    
+    private static final int MAX_SLOTS_PER_PAGE = 7;
+    private static final int WORKBENCH_SLOTS = 10;
+
+    private GlyphInstance hoverInst = null;
+    private String hoverErr = null;
+
+    public GlyphWorkbenchScreen(GlyphWorkbenchMenu menu, Inventory inv, Component title) {
+        super(menu, inv, title);
+        this.grimoireSlot = menu.getGrimoireSlot();
+        this.imageWidth = 350;
+        this.imageHeight = 240;
+        this.titleLabelX = 8;
+        this.titleLabelY = 6;
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+        ClientGlyphIcons.clearCache();
+    }
+
+    @Override
+    protected void renderLabels(GuiGraphics gfx, int mouseX, int mouseY) {
+        gfx.drawString(font, this.title, this.titleLabelX, this.titleLabelY, 0xFFE0E0E0, false);
+    }
+
+    @Override
+    protected void renderBg(GuiGraphics gfx, float partialTick, int mouseX, int mouseY) {
+        gfx.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xFF2E1B15);
+        gfx.fill(leftPos + 2, topPos + 2, leftPos + imageWidth - 2, topPos + imageHeight - 2, 0xFF5D4037);
+
+        int pX = leftPos + 180;
+        int pY = topPos + 10;
+        int pW = 160;
+        int pH = 220;
+        gfx.fill(pX, pY, pX + pW, pY + pH, 0xFFF2E8CF);
+        gfx.fill(pX, pY, pX + pW, pY + 1, 0xFF8D6E63);
+        gfx.fill(pX, pY, pX + 1, pY + pH, 0xFF8D6E63);
+
+        gfx.fill(leftPos + 19, topPos + 19, leftPos + 37, topPos + 37, 0xFF373737);
+        gfx.fill(leftPos + 20, topPos + 20, leftPos + 36, topPos + 36, 0xFF8B8B8B);
+
+        int startX = leftPos + 18;
+        int startY = topPos + 60;
+        for (int i = 0; i < WORKBENCH_SLOTS; i++) {
+            int x = startX + (i % 5) * (SLOT_SIZE + SLOT_GAP);
+            int y = startY + (i / 5) * (SLOT_SIZE + SLOT_GAP);
+            gfx.fill(x, y, x + SLOT_SIZE, y + SLOT_SIZE, 0xFF373737);
+            gfx.fill(x + 1, y + 1, x + SLOT_SIZE - 1, y + SLOT_SIZE - 1, 0xFF8B8B8B);
+        }
+
+        gfx.fill(leftPos + 10, topPos + 130, leftPos + 170, topPos + 131, 0xFF8D6E63);
+        gfx.fill(leftPos + 10, topPos + 132, leftPos + 170, topPos + 232, 0xFF3A251A);
+    }
+
+    private record BankView(List<GlyphInstance> groups, Map<GlyphInstance, Integer> counts,
+                            Map<GlyphInstance, Integer> firstIndices) {}
+
+    private static BankView buildBankView(ItemStack book) {
+        List<GlyphInstance> raw = GrimoireData.getBankList(book);
+        Map<GlyphInstance, Integer> counts = new LinkedHashMap<>();
+        Map<GlyphInstance, Integer> firstIndices = new HashMap<>();
+        for (int i = 0; i < raw.size(); i++) {
+            GlyphInstance inst = raw.get(i);
+            if (Glyphs.byId(inst.typeId()) == null) continue;
+            if (!firstIndices.containsKey(inst)) firstIndices.put(inst, i);
+            counts.merge(inst, 1, Integer::sum);
+        }
+        return new BankView(new ArrayList<>(counts.keySet()), counts, firstIndices);
+    }
+
+    @Override
+    public void render(GuiGraphics gfx, int mouseX, int mouseY, float partialTick) {
+        this.renderBackground(gfx, mouseX, mouseY, partialTick);
+        hoverInst = null;
+        hoverErr = null;
+        super.render(gfx, mouseX, mouseY, partialTick);
+
+        ItemStack book = menu.getGrimoire();
+        boolean hoverBook = inRect(mouseX, mouseY, leftPos + 20, topPos + 20, 16, 16);
+        if (hoverBook) gfx.fill(leftPos + 19, topPos + 19, leftPos + 37, topPos + 37, 0x80FFFFFF);
+
+        if (!(book.getItem() instanceof GrimoireItem)) {
+            gfx.drawString(font, Component.translatable("gui.grimoiremod.grimoire_not_found").getString(),
+                    leftPos + 50, topPos + 25, 0xFFFF5555, false);
+            this.renderTooltip(gfx, mouseX, mouseY);
+            return;
+        }
+
+        int pageCount = GrimoireData.getPageCount(book);
+        int active = GrimoireData.getActivePage(book);
+        GlyphPage page = GrimoireData.getPage(book, active);
+
+        int navX = leftPos + 60, navY = topPos + 22;
+        boolean hoverPrev = inRect(mouseX, mouseY, navX, navY, 12, 12);
+        boolean hoverNext = inRect(mouseX, mouseY, navX + 40, navY, 12, 12);
+        gfx.drawString(font, "<", navX + 3, navY + 2, hoverPrev ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+        gfx.drawString(font, ">", navX + 43, navY + 2, hoverNext ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+
+        int displayTotal = pageCount;
+        boolean hasToc = false;
+        for (int i = 0; i < pageCount; i++) {
+            GlyphPage p = GrimoireData.getPage(book, i);
+            if (p != null && p.isToc()) hasToc = true;
+        }
+        if (hasToc) displayTotal--;
+
+        int displayActive = GrimoireData.spellNumber(book, active);
+        String navText = (page != null && page.isToc()) 
+                ? Component.translatable("gui.grimoiremod.toc_short").getString() 
+                : (displayActive + "/" + displayTotal);
+        gfx.drawString(font, navText, navX + 18, navY + 2, 0xFFAAAAAA, false);
+
+        if (page != null && !page.isToc()) {
+            String spellName = page.name == null || page.name.isBlank()
+                    ? Component.translatable("gui.grimoiremod.spell", GrimoireData.spellNumber(book, active)).getString()
+                    : page.name;
+            gfx.drawString(font, spellName, leftPos + 20, topPos + 45, 0xFFE0E0E0, false);
+
+            int startX = leftPos + 18;
+            int startY = topPos + 60;
+            SpellParser.Parsed parsed = SpellParser.parse(page);
+            Map<Integer, String> errors = parsed.errors();
+
+            for (int i = 0; i < WORKBENCH_SLOTS; i++) {
+                int x = startX + (i % 5) * (SLOT_SIZE + SLOT_GAP);
+                int y = startY + (i / 5) * (SLOT_SIZE + SLOT_GAP);
+                boolean isLocked = i >= page.slotCount;
+                boolean isSel = (i == selectedSlot);
+                boolean hover = inRect(mouseX, mouseY, x, y, SLOT_SIZE, SLOT_SIZE);
+
+                int border = isLocked ? 0xFF222222 : (isSel ? 0xFFFFAA00 : 0xFF373737);
+                int fill = isLocked ? 0xFF333333 : 0xFF8B8B8B;
+                gfx.fill(x, y, x + SLOT_SIZE, y + SLOT_SIZE, border);
+                gfx.fill(x + 1, y + 1, x + SLOT_SIZE - 1, y + SLOT_SIZE - 1, fill);
+
+                if (isLocked) {
+                    String lockStr = "\uD83D\uDD12";
+                    int lw = font.width(lockStr);
+                    gfx.drawString(font, lockStr, x + SLOT_SIZE / 2 - lw / 2, y + SLOT_SIZE / 2 - 4, 0xFF888888, false);
+                    continue;
+                }
+
+                GlyphInstance inst = page.slots[i];
+                if (inst != null) {
+                    Glyph g = Glyphs.byId(inst.typeId());
+                    if (g != null) {
+                        ClientGlyphIcons.draw(gfx, font, g, x + 2, y + 2, 20);
+                        if (errors.containsKey(i)) {
+                            gfx.fill(x - 1, y - 1, x + 9, y + 9, 0xFFFF0000);
+                            gfx.drawString(font, "!", x + 4 - font.width("!") / 2, y, 0xFFFFFFFF, false);
+                            if (hover) hoverErr = errors.get(i);
+                        }
+                        if (hover) hoverInst = inst;
+                    }
+                }
+            }
+
+            if (errors.containsKey(-1) && inRect(mouseX, mouseY, leftPos + 18, topPos + 60,
+                    5 * (SLOT_SIZE + SLOT_GAP), 2 * (SLOT_SIZE + SLOT_GAP))) {
+                if (hoverInst == null && hoverErr == null) hoverErr = errors.get(-1);
+            }
+
+            gfx.drawString(font, Component.translatable("gui.grimoiremod.bank").getString(),
+                    leftPos + 12, topPos + 136, 0xFFAAAAAA, false);
+
+            BankView bankView = buildBankView(book);
+            List<GlyphInstance> groupList = bankView.groups();
+            Map<GlyphInstance, Integer> counts = bankView.counts();
+
+            int bankX = leftPos + 20, bankY = topPos + 150;
+            int maxScroll = Math.max(0, groupList.size() - (BANK_COLS * BANK_ROWS_VISIBLE));
+            if (bankScroll > maxScroll) bankScroll = maxScroll;
+
+            for (int gi = bankScroll; gi < groupList.size() && gi < bankScroll + BANK_COLS * BANK_ROWS_VISIBLE; gi++) {
+                GlyphInstance inst = groupList.get(gi);
+                Glyph g = Glyphs.byId(inst.typeId());
+                if (g == null) continue;
+                int localIdx = gi - bankScroll;
+                int col = localIdx % BANK_COLS, row = localIdx / BANK_COLS;
+                int x = bankX + col * (CELL_SIZE + GAP);
+                int y = bankY + row * (CELL_SIZE + GAP);
+                boolean isSel = (selectedBankInst != null && selectedBankInst.equals(inst));
+                int border = isSel ? 0xFFFFAA00 : 0xFF222222;
+                gfx.fill(x, y, x + CELL_SIZE, y + CELL_SIZE, border);
+                gfx.fill(x + 1, y + 1, x + CELL_SIZE - 1, y + CELL_SIZE - 1, 0xFF555555);
+                ClientGlyphIcons.draw(gfx, font, g, x + 1, y + 1, 16);
+                if (inRect(mouseX, mouseY, x, y, CELL_SIZE, CELL_SIZE)) hoverInst = inst;
+                int count = counts.get(inst);
+                if (count > 1) {
+                    String cnt = "x" + count;
+                    gfx.pose().pushPose();
+                    gfx.pose().translate(x + CELL_SIZE - 1, y + CELL_SIZE - 6, 0);
+                    float scale = count >= 100 ? 0.5f : (count >= 10 ? 0.6f : 0.75f);
+                    gfx.pose().scale(scale, scale, 1.0f);
+                    gfx.drawString(font, cnt, -font.width(cnt), 0, 0xFF333333, false);
+                    gfx.pose().popPose();
+                }
+                if (inst.totalPoints() > 0) gfx.drawString(font, "+", x + CELL_SIZE - 6, y, 0xFFFFAA00, false);
+            }
+
+            if (groupList.size() > BANK_COLS * BANK_ROWS_VISIBLE) {
+                int scrollX = leftPos + 162;
+                boolean hoverUp = inRect(mouseX, mouseY, scrollX, bankY, 10, 10);
+                boolean hoverDown = inRect(mouseX, mouseY, scrollX, bankY + 40, 10, 10);
+                gfx.drawString(font, "^", scrollX, bankY, hoverUp ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+                gfx.drawString(font, "v", scrollX, bankY + 40, hoverDown ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+            }
+
+            GlyphInstance targetInst = null;
+            boolean isBankTarget = false;
+
+            if (selectedSlot >= 0 && selectedSlot < page.slotCount && page.slots[selectedSlot] != null) {
+                targetInst = page.slots[selectedSlot];
+            } else if (selectedBankInst != null) {
+                targetInst = selectedBankInst;
+                isBankTarget = true;
+            }
+
+            if (targetInst != null) {
+                Glyph g = Glyphs.byId(targetInst.typeId());
+                if (g != null) {
+                    int textX = leftPos + 190, textY = topPos + 20;
+                    String prefix = isBankTarget ? Component.translatable("gui.grimoiremod.bank_prefix").getString() : "";
+                    gfx.drawString(font, prefix + g.getDisplayName().getString(), textX, textY, 0xFF3A2E20, false);
+                    gfx.drawString(font, Component.translatable("gui.grimoiremod.points", targetInst.totalPoints()).getString(),
+                            textX, textY + 12, 0xFF886A4A, false);
+                    gfx.fill(textX, textY + 24, leftPos + 330, textY + 25, 0xFF8D6E63);
+
+                    List<Stat> stats = new ArrayList<>();
+                    for (Stat cand : Stat.values()) {
+                        if (g.canUpgrade(cand)) stats.add(cand);
+                    }
+                    
+                    for (int s = 0; s < stats.size(); s++) {
+                        Stat stat = stats.get(s);
+                        int pts = targetInst.getPoints(stat);
+                        int y = textY + 35 + s * 24;
+                        gfx.drawString(font, stat.getDisplayName().getString() + ": " + pts, textX, y + 2, 0xFF333333, false);
+
+                        int plusX = leftPos + 280, minusX = leftPos + 305;
+                        boolean hoverPlus = inRect(mouseX, mouseY, plusX, y, BUTTON_W, BUTTON_H);
+                        boolean hoverMinus = inRect(mouseX, mouseY, minusX, y, BUTTON_W, BUTTON_H);
+                        boolean isAdvanced = g.advanced();
+                        boolean canAdd = !isAdvanced && (GrimoireData.getSpentPoints(book, stat) < GrimoireData.getStatBudget(book, stat));
+                        boolean canSub = !isAdvanced && (pts > 0);
+
+                        int plusFill = canAdd ? (hoverPlus ? 0xFF77AA77 : 0xFF555555) : 0xFF333333;
+                        gfx.fill(plusX, y, plusX + BUTTON_W, y + BUTTON_H, plusFill);
+                        gfx.drawString(font, "+", plusX + 4, y + 2, canAdd ? 0xFFFFFFFF : 0xFF888888, false);
+
+                        int minusFill = canSub ? (hoverMinus ? 0xFFAA7777 : 0xFF555555) : 0xFF333333;
+                        gfx.fill(minusX, y, minusX + BUTTON_W, y + BUTTON_H, minusFill);
+                        gfx.drawString(font, "-", minusX + 5, y + 2, canSub ? 0xFFFFFFFF : 0xFF888888, false);
+                    }
+
+                    int resetY = textY + 165;
+                    boolean hoverReset = inRect(mouseX, mouseY, textX, resetY, 60, 16);
+                    gfx.fill(textX, resetY, textX + 60, resetY + 16, hoverReset ? 0xFFAA4444 : 0xFF555555);
+                    gfx.drawString(font, Component.translatable("gui.grimoiremod.reset").getString(), textX + 8, resetY + 4, 0xFFFFFFFF, false);
+                }
+            } else {
+                String msg = Component.translatable("gui.grimoiremod.select_glyph").getString();
+                int msgW = font.width(msg);
+                gfx.drawString(font, msg, leftPos + 180 + (160 - msgW) / 2, topPos + 100, 0xFF888888, false);
+            }
+        }
+
+        this.renderTooltip(gfx, mouseX, mouseY);
+
+        if (hoverInst != null) {
+            List<Component> tooltip = GlyphTooltip.build(hoverInst, hoverErr);
+            if (!tooltip.isEmpty()) gfx.renderTooltip(font, tooltip, java.util.Optional.empty(), mouseX, mouseY);
+        } else if (hoverErr != null) {
+            gfx.renderTooltip(font, Component.translatable(hoverErr), mouseX, mouseY);
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mx, double my, int button) {
+        ItemStack book = menu.getGrimoire();
+        if (!(book.getItem() instanceof GrimoireItem)) return super.mouseClicked(mx, my, button);
+
+        int active = GrimoireData.getActivePage(book);
+        GlyphPage page = GrimoireData.getPage(book, active);
+        if (page == null || page.isToc()) return super.mouseClicked(mx, my, button);
+
+        int navX = leftPos + 60, navY = topPos + 22;
+        if (inRect(mx, my, navX, navY, 12, 12)) {
+            PacketDistributor.sendToServer(GrimoireActionPacket.switchPage(grimoireSlot, false));
+            selectedSlot = -1; selectedBankInst = null; return true;
+        }
+        if (inRect(mx, my, navX + 40, navY, 12, 12)) {
+            PacketDistributor.sendToServer(GrimoireActionPacket.switchPage(grimoireSlot, true));
+            selectedSlot = -1; selectedBankInst = null; return true;
+        }
+
+        int startX = leftPos + 18, startY = topPos + 60;
+        for (int i = 0; i < WORKBENCH_SLOTS; i++) {
+            if (i >= page.slotCount) continue;
+            int x = startX + (i % 5) * (SLOT_SIZE + SLOT_GAP);
+            int y = startY + (i / 5) * (SLOT_SIZE + SLOT_GAP);
+            if (inRect(mx, my, x, y, SLOT_SIZE, SLOT_SIZE)) {
+                if (button == 1) {
+                    if (page.slots[i] != null) {
+                        PacketDistributor.sendToServer(GrimoireActionPacket.removeGlyph(grimoireSlot, active, i));
+                        selectedSlot = -1;
+                    }
+                } else {
+                    if (page.slots[i] != null) {
+                        selectedSlot = (selectedSlot == i) ? -1 : i;
+                        selectedBankInst = null;
+                    } else if (selectedBankInst != null) {
+                        PacketDistributor.sendToServer(GrimoireActionPacket.placeGlyph(
+                                grimoireSlot, active, i, selectedBankInst.typeId(), selectedBankInst.allocations()));
+                        selectedBankInst = null;
+                    }
+                }
+                return true;
+            }
+        }
+
+        BankView bankView = buildBankView(book);
+        List<GlyphInstance> groupList = bankView.groups();
+        int bankX = leftPos + 20, bankY = topPos + 150;
+        int maxScroll = Math.max(0, groupList.size() - (BANK_COLS * BANK_ROWS_VISIBLE));
+
+        if (groupList.size() > BANK_COLS * BANK_ROWS_VISIBLE) {
+            int scrollX = leftPos + 162;
+            if (inRect(mx, my, scrollX, bankY, 10, 10)) { bankScroll = Math.max(0, bankScroll - BANK_COLS); return true; }
+            if (inRect(mx, my, scrollX, bankY + 40, 10, 10)) { bankScroll = Math.min(maxScroll, bankScroll + BANK_COLS); return true; }
+        }
+
+        for (int gi = bankScroll; gi < groupList.size() && gi < bankScroll + BANK_COLS * BANK_ROWS_VISIBLE; gi++) {
+            int localIdx = gi - bankScroll;
+            int col = localIdx % BANK_COLS, row = localIdx / BANK_COLS;
+            int x = bankX + col * (CELL_SIZE + GAP);
+            int y = bankY + row * (CELL_SIZE + GAP);
+            if (inRect(mx, my, x, y, CELL_SIZE, CELL_SIZE)) {
+                GlyphInstance inst = groupList.get(gi);
+                selectedBankInst = (selectedBankInst != null && selectedBankInst.equals(inst)) ? null : inst;
+                selectedSlot = -1;
+                return true;
+            }
+        }
+
+        List<GlyphInstance> rawBank = GrimoireData.getBankList(book);
+        GlyphInstance targetInst = null;
+        boolean isBankTarget = false;
+        if (selectedSlot >= 0 && selectedSlot < page.slotCount && page.slots[selectedSlot] != null) {
+            targetInst = page.slots[selectedSlot];
+        } else if (selectedBankInst != null) {
+            targetInst = selectedBankInst;
+            isBankTarget = true;
+        }
+
+        if (targetInst != null) {
+            List<Stat> stats = new ArrayList<>();
+            Glyph g = Glyphs.byId(targetInst.typeId());
+            for (Stat cand : Stat.values()) {
+                if (g.canUpgrade(cand)) stats.add(cand);
+            }
+            
+            int textY = topPos + 20;
+            boolean isAdvanced = g != null && g.advanced();
+            for (int s = 0; s < stats.size(); s++) {
+                int y = textY + 35 + s * 24;
+                int plusX = leftPos + 280, minusX = leftPos + 305;
+                
+                int targetIdx = -1;
+                if (isBankTarget) {
+                    targetIdx = rawBank.indexOf(selectedBankInst);
+                } else {
+                    targetIdx = selectedSlot;
+                }
+
+                if (inRect(mx, my, plusX, y, BUTTON_W, BUTTON_H)) {
+                    if (!isAdvanced && GrimoireData.canAllocate(book, stats.get(s), 1) && targetIdx != -1) {
+                        PacketDistributor.sendToServer(new AllocatePointPacket(
+                                grimoireSlot, active, targetIdx, stats.get(s), 1, isBankTarget));
+                    }
+                    return true;
+                }
+                if (inRect(mx, my, minusX, y, BUTTON_W, BUTTON_H)) {
+                    if (!isAdvanced && targetIdx != -1) {
+                        PacketDistributor.sendToServer(new AllocatePointPacket(
+                                grimoireSlot, active, targetIdx, stats.get(s), -1, isBankTarget));
+                    }
+                    return true;
+                }
+            }
+            int resetY = textY + 165;
+            if (inRect(mx, my, leftPos + 190, resetY, 60, 16)) {
+                if (isBankTarget) {
+                    int idx = rawBank.indexOf(selectedBankInst);
+                    if (idx != -1) PacketDistributor.sendToServer(GrimoireActionPacket.resetGlyphInBank(grimoireSlot, idx));
+                } else {
+                    PacketDistributor.sendToServer(GrimoireActionPacket.resetGlyph(grimoireSlot, active, selectedSlot));
+                }
+                return true;
+            }
+        }
+        return super.mouseClicked(mx, my, button);
+    }
+
+    private boolean inRect(double mx, double my, int x, int y, int w, int h) {
+        return mx >= x && mx < x + w && my >= y && my < y + h;
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/client/GrimoireScreen.java -----
+package com.example.grimoiremod.client;
+
+import com.example.grimoiremod.data.GlyphInstance;
+import com.example.grimoiremod.data.GlyphPage;
+import com.example.grimoiremod.data.GrimoireData;
+import com.example.grimoiremod.data.SpellDescriber;
+import com.example.grimoiremod.data.SpellParser;
+import com.example.grimoiremod.glyphs.Glyph;
+import com.example.grimoiremod.glyphs.GlyphCategory;
+import com.example.grimoiremod.glyphs.Glyphs;
+import com.example.grimoiremod.item.GrimoireItem;
+import com.example.grimoiremod.network.GrimoireActionPacket;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
+import net.neoforged.neoforge.network.PacketDistributor;
+import org.lwjgl.glfw.GLFW;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+public class GrimoireScreen extends Screen {
+
+    private static final int PAGE_W = 180;
+    private static final int PAGE_H = 290;
+    private static final int SPINE  = 8;
+    private static final int BOOK_W = PAGE_W * 2 + SPINE;
+    private static final int BOOK_H = PAGE_H;
+    private static final int COVER_PAD = 10;
+    private static final int MAX_SLOTS_PER_PAGE = 7;
+
+    private static final int ICON = 16;
+    private static final int SLOT = 24;
+    private static final int SLOT_GAP = 4;
+    private static final int BANK_CELL = 24;
+    private static final int BANK_GAP = 4;
+    private static final int BANK_COLS = 4;
+
+    private static final int TOC_ROW_H = 22;
+    private static final int TOC_TOP   = 30;
+
+    private static final int COVER         = 0xFF4A2E1E;
+    private static final int PAGE_BG       = 0xFFF2E8CF;
+    private static final int PAGE_BG_ALT   = 0xFFEADDBA;
+    private static final int PAGE_BG_HOVER = 0xFFF7EDCB;
+    private static final int PAGE_BG_DRAG  = 0xFFD8C89A;
+    private static final int INK           = 0xFF3A2E20;
+    private static final int INK_DIM       = 0xFF886A4A;
+    private static final int SLOT_BORDER   = 0xFF5B4636;
+    private static final int SLOT_SEL      = 0xFFFFE9A0;
+    private static final int SLOT_DROP     = 0xFF88CC66;
+    private static final int CAT_HEADER    = 0xFF6A4A30;
+    private static final int TOC_GOLD      = 0xFFC9A64A;
+    private static final int TAB_ACTIVE    = 0xFFE8D8A0;
+    private static final int TAB_HOVER     = 0xFFF0E8C0;
+    private static final int TAB_IDLE      = 0xFFDCCFA0;
+
+    private static final GlyphCategory[] TAB_CATEGORIES = {
+            null, GlyphCategory.FORM, GlyphCategory.ELEMENT,
+            GlyphCategory.EFFECT, GlyphCategory.MODIFIER, GlyphCategory.FORM_MODIFIER
+    };
+    private static final String[] TAB_LABELS_SHORT = { "gui.grimoiremod.tab.all_short", "gui.grimoiremod.tab.forms_short", "gui.grimoiremod.tab.elements_short", "gui.grimoiremod.tab.effects_short", "gui.grimoiremod.tab.modifiers_short", "gui.grimoiremod.tab.form_mods_short" };
+    private static final String[] TAB_LABELS_FULL  = { "gui.grimoiremod.tab.all", "gui.grimoiremod.tab.forms", "gui.grimoiremod.tab.elements", "gui.grimoiremod.tab.effects", "gui.grimoiremod.tab.modifiers", "gui.grimoiremod.tab.form_mods" };
+
+    private final int itemSlotId;
+    private int bookLeft, bookTop;
+    private int leftPageX, leftPageY, rightPageX, rightPageY;
+
+    private int selectedSlot = -1;
+    private int bankScroll = 0;
+    private GlyphInstance hoverGlyph = null;
+    private String hoverError = null;
+    private int hoverBankTab = -1;
+    private int hoverNav = 0;
+    private int hoverBookmark = -1;
+    private GlyphInstance draggingInst = null;
+    private boolean draggingFromPage = false;
+
+    private GlyphCategory selectedBankTab = null;
+    private final int[] tabWidths = new int[TAB_CATEGORIES.length];
+
+    private int tocDragFrom = -1;
+    private int tocDropTarget = -1;
+    private boolean tocDropAfter = false;
+    private boolean tocDragMoved = false;
+
+    private EditBox nameField;
+    private int lastPageForName = -1;
+    private final int[][] tabPositions = new int[TAB_CATEGORIES.length][4];
+
+    private CompoundTag cachedTag;
+    private Snapshot  cachedSnap;
+
+    public GrimoireScreen(int itemSlotId) {
+        super(Component.translatable("gui.grimoiremod.grimoire"));
+        this.itemSlotId = itemSlotId;
+    }
+
+    public int getSlotId() { return itemSlotId; }
+
+    public boolean isNameFieldFocused() {
+        return nameField != null && nameField.isFocused();
+    }
+
+    private ItemStack stack() {
+        var p = Minecraft.getInstance().player;
+        if (p == null) return ItemStack.EMPTY;
+        ItemStack s = p.getInventory().getItem(itemSlotId);
+        return s.getItem() instanceof GrimoireItem ? s : ItemStack.EMPTY;
+    }
+
+    private Snapshot snapshot() {
+        ItemStack s = stack();
+        if (s.isEmpty()) return null;
+        CustomData cd = s.get(DataComponents.CUSTOM_DATA);
+        CompoundTag tag = cd != null ? cd.copyTag() : new CompoundTag();
+        if (tag.equals(cachedTag) && cachedSnap != null) return cachedSnap;
+
+        int pageCount = GrimoireData.getPageCount(s);
+        int active    = GrimoireData.getActivePage(s);
+        List<GlyphPage> pages = new ArrayList<>(pageCount);
+        int[] spellNums = new int[pageCount];
+        int n = 0;
+        boolean hasToc = false;
+        for (int i = 0; i < pageCount; i++) {
+            GlyphPage p = GrimoireData.getPage(s, i);
+            pages.add(p);
+            if (p != null && p.isSpell()) n++;
+            if (p != null && p.isToc()) hasToc = true;
+            spellNums[i] = n;
+        }
+        Map<GlyphInstance, Integer> bank = null;
+        GlyphPage activePage = (active >= 0 && active < pages.size()) ? pages.get(active) : null;
+        if (activePage != null && activePage.isSpell()) {
+            bank = GrimoireData.getBankGrouped(s);
+        }
+
+        SpellParser.Parsed parsed = null;
+        List<Component> described = null;
+        if (activePage != null && activePage.isSpell()) {
+            parsed = SpellParser.parse(activePage);
+            described = SpellDescriber.describeLines(activePage);
+        }
+
+        cachedTag = tag;
+        cachedSnap = new Snapshot(pageCount, active, pages, spellNums, bank, hasToc, parsed, described);
+        return cachedSnap;
+    }
+
+    private record Snapshot(int pageCount, int active, List<GlyphPage> pages,
+                            int[] spellNumbers, Map<GlyphInstance, Integer> bank,
+                            boolean hasToc, SpellParser.Parsed parsed, List<Component> describedLines) {
+        GlyphPage page(int i) { return (i >= 0 && i < pages.size()) ? pages.get(i) : null; }
+        GlyphPage activePage() { return page(active); }
+        int spellNumber(int i) { return (i >= 0 && i < spellNumbers.length) ? spellNumbers[i] : 0; }
+    }
+
+    @Override
+    protected void init() {
+        bookLeft = (width - BOOK_W) / 2;
+        bookTop  = (height - BOOK_H) / 2;
+        leftPageX  = bookLeft;
+        leftPageY  = bookTop;
+        rightPageX = bookLeft + PAGE_W + SPINE;
+        rightPageY = bookTop;
+
+        ClientGlyphIcons.clearCache();
+        selectedBankTab = null;
+
+        int availableW = PAGE_W - 16;
+        for (int t = 0; t < TAB_CATEGORIES.length; t++) tabWidths[t] = availableW / TAB_CATEGORIES.length;
+
+        nameField = new EditBox(font, leftPageX + 8, leftPageY + 20, PAGE_W - 16, 12,
+                Component.translatable("gui.grimoiremod.name"));
+        nameField.setMaxLength(32);
+        nameField.setBordered(true);
+        lastPageForName = -1;
+    }
+
+    @Override public boolean isPauseScreen() { return false; }
+
+    @Override
+    public void render(GuiGraphics gfx, int mx, int my, float pt) {
+        super.render(gfx, mx, my, pt);
+
+        Snapshot snap = snapshot();
+        if (snap == null) { Minecraft.getInstance().tell(this::onClose); return; }
+
+        int pageCount = snap.pageCount();
+        int active    = snap.active();
+        GlyphPage page = snap.activePage();
+
+        gfx.fill(0, 0, width, height, 0x99000000);
+        gfx.fill(bookLeft - COVER_PAD, bookTop - COVER_PAD,
+                 bookLeft + BOOK_W + COVER_PAD, bookTop + BOOK_H + COVER_PAD, COVER);
+        gfx.fill(leftPageX + PAGE_W, leftPageY, rightPageX, rightPageY, 0xFF2E1C10);
+        gfx.fill(leftPageX, leftPageY, leftPageX + PAGE_W, leftPageY + PAGE_H, PAGE_BG);
+        gfx.fill(rightPageX, rightPageY, rightPageX + PAGE_W, rightPageY + PAGE_H, PAGE_BG);
+
+        hoverGlyph = null;
+        hoverError = null;
+        hoverNav = 0;
+        hoverBookmark = -1;
+
+        if (page == null) return;
+
+        if (page.isToc()) hoverBankTab = -1;
+
+        if (active != lastPageForName) {
+            lastPageForName = active;
+            nameField.setValue(page.name == null ? "" : page.name);
+            nameField.setFocused(false);
+            selectedSlot = -1;
+        }
+
+        renderBookmarks(gfx, mx, my, snap, active);
+
+        if (page.isToc()) {
+            if (tocDragFrom >= 0) updateTocDrop(mx, my, snap);
+            renderTocPage(gfx, mx, my, snap);
+        } else {
+            renderTabs(gfx, mx, my);
+            renderLeftPage(gfx, mx, my, snap, page, active);
+            renderBank(gfx, mx, my, snap);
+            nameField.render(gfx, mx, my, pt);
+        }
+
+        renderNav(gfx, mx, my, active, pageCount, snap);
+
+        if (draggingInst != null && !page.isToc()) {
+            int dropSlot = slotUnderCursor(mx, my, page);
+            if (dropSlot >= 0 && page.slots[dropSlot] == null) {
+                highlightSlot(gfx, dropSlot, SLOT_DROP);
+            }
+            Glyph g = Glyphs.byId(draggingInst.typeId());
+            if (g != null) {
+                ClientGlyphIcons.draw(gfx, font, g, (int)(mx - ICON / 2.0), (int)(my - ICON / 2.0), ICON);
+            }
+        }
+
+        if (hoverGlyph != null) {
+            List<Component> tooltip = GlyphTooltip.build(hoverGlyph, hoverError);
+            if (!tooltip.isEmpty()) gfx.renderTooltip(font, tooltip, java.util.Optional.empty(), mx, my);
+        }
+    }
+
+    private void renderBookmarks(GuiGraphics gfx, int mx, int my, Snapshot snap, int active) {
+        int bx = bookLeft + BOOK_W + COVER_PAD + 2;
+        int by0 = bookTop + 8;
+
+        int maxBookmarks = 10;
+        int bh = (BOOK_H - 16) / maxBookmarks;
+        int favCount = 0;
+        hoverBookmark = -1;
+
+        for (int i = 0; i < snap.pageCount() && favCount < maxBookmarks; i++) {
+            GlyphPage p = snap.page(i);
+            if (p == null || !p.favorite) continue;
+
+            int by = by0 + favCount * bh;
+            boolean hover = inRect(mx, my, bx, by, 22, bh - 1);
+            if (hover) hoverBookmark = i;
+
+            int color = (i == active) ? brighten(p.bookmarkColor) : p.bookmarkColor;
+            int border = hover ? 0xFFFFFFFF : 0xFF2E1C10;
+            gfx.fill(bx - 1, by - 1, bx + 23, by + bh, border);
+            gfx.fill(bx, by, bx + 22, by + bh - 1, color);
+
+            String label = p.isToc() ? "T" : String.valueOf(snap.spellNumber(i));
+            int textColor = getContrastColor(color);
+            gfx.drawString(font, label, bx + 11 - font.width(label) / 2, by + bh / 2 - 4, textColor, false);
+
+            if (hover) {
+                String name = p.isToc()
+                        ? Component.translatable("gui.grimoiremod.toc").getString()
+                        : (p.name == null || p.name.isBlank()
+                            ? Component.translatable("gui.grimoiremod.spell", snap.spellNumber(i)).getString()
+                            : p.name);
+                int tw = font.width(name);
+                gfx.fill(bx + 22, by, bx + 22 + tw + 8, by + bh - 1, color);
+                gfx.fill(bx + 22 + tw + 8, by, bx + 22 + tw + 9, by + bh - 1, border);
+                gfx.drawString(font, name, bx + 26, by + bh / 2 - 4, textColor, false);
+            }
+
+            favCount++;
+        }
+    }
+
+    private int getContrastColor(int color) {
+        int r = (color >> 16) & 0xFF;
+        int g = (color >> 8) & 0xFF;
+        int b = color & 0xFF;
+        int yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return (yiq >= 128) ? 0xFF000000 : 0xFFFFFFFF;
+    }
+
+    private void renderTocPage(GuiGraphics gfx, int mx, int my, Snapshot snap) {
+        gfx.drawString(font, Component.translatable("gui.grimoiremod.toc").getString(),
+                leftPageX + 8, leftPageY + 4, INK, false);
+        gfx.fill(leftPageX + 8, leftPageY + 18, leftPageX + PAGE_W - 8, leftPageY + 19, INK_DIM);
+
+        int count = snap.pageCount();
+        int rowY = leftPageY + TOC_TOP;
+        boolean hasIndicator = tocDragFrom >= 0 && tocDropTarget >= 0 && tocDragMoved;
+        int indicatorY = -1;
+
+        if (hasIndicator) {
+            int to = computeToPage(tocDragFrom, tocDropTarget, tocDropAfter);
+            if (to != tocDragFrom) {
+                int scanY = leftPageY + TOC_TOP;
+                for (int i = 0; i < count; i++) {
+                    GlyphPage p = snap.page(i);
+                    if (p == null || p.isToc()) continue;
+                    if (i == tocDropTarget) {
+                        indicatorY = tocDropAfter ? scanY + TOC_ROW_H - 2 : scanY;
+                        break;
+                    }
+                    scanY += TOC_ROW_H;
+                }
+            }
+        }
+
+        for (int i = 0; i < count; i++) {
+            GlyphPage p = snap.page(i);
+            if (p == null) continue;
+            if (p.isToc()) continue;
+
+            boolean isDragging = (i == tocDragFrom);
+            boolean hover = inRect(mx, my, leftPageX + 8, rowY, PAGE_W - 16, TOC_ROW_H - 2);
+
+            int bg;
+            if (isDragging && tocDragMoved) bg = PAGE_BG_DRAG;
+            else if (hover) bg = PAGE_BG_HOVER;
+            else bg = PAGE_BG_ALT;
+
+            gfx.fill(leftPageX + 8, rowY, leftPageX + PAGE_W - 8, rowY + TOC_ROW_H - 2, bg);
+            gfx.fill(leftPageX + 12, rowY + 4, leftPageX + 16, rowY + TOC_ROW_H - 6, p.bookmarkColor);
+
+            int num = snap.spellNumber(i);
+            String label = Component.translatable("gui.grimoiremod.spell", num).getString();
+            if (p.name != null && !p.name.isBlank()) label += ": " + p.name;
+            int textColor = (isDragging && tocDragMoved) ? INK_DIM : INK;
+            gfx.drawString(font, label, leftPageX + 22, rowY + 5, textColor, false);
+
+            String favStr = p.favorite ? "*" : "-";
+            gfx.drawString(font, favStr, leftPageX + PAGE_W - 20, rowY + 5,
+                    p.favorite ? 0xFFFFAA00 : INK_DIM, false);
+
+            rowY += TOC_ROW_H;
+        }
+
+        if (indicatorY >= 0) {
+            gfx.fill(leftPageX + 8, indicatorY - 1, leftPageX + PAGE_W - 8, indicatorY + 1, TOC_GOLD);
+        }
+
+        String hint = tocDragFrom >= 0 && tocDragMoved
+                ? Component.translatable("gui.grimoiremod.drop_hint").getString()
+                : Component.translatable("gui.grimoiremod.drag_hint").getString();
+        gfx.drawString(font, hint, leftPageX + 8, leftPageY + PAGE_H - 20, INK_DIM, false);
+    }
+
+    private void renderLeftPage(GuiGraphics gfx, int mx, int my, Snapshot snap, GlyphPage page, int pageIdx) {
+        int num = snap.spellNumber(pageIdx);
+        gfx.drawString(font, Component.translatable("gui.grimoiremod.spell", num).getString(),
+                leftPageX + 8, leftPageY + 4, INK, false);
+
+        String favStr = page.favorite ? "*" : "-";
+        gfx.drawString(font, favStr, leftPageX + PAGE_W - 20, leftPageY + 4,
+                page.favorite ? 0xFFFFAA00 : INK_DIM, false);
+
+        int startY = leftPageY + 70;
+        int startX = leftPageX + 15;
+
+        SpellParser.Parsed parsed = snap.parsed();

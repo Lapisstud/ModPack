@@ -1,0 +1,49 @@
+.gradle/
+build/
+runs/
+*.iml
+.idea/
+
+# Dev tool dump (see apply_update.sh)
+project_dump.txt
+
+# === Grimoire modpack (auto-added by tools/setup_git.sh) ===
+modpack/resourcepacks/grimoire_assets/assets/grimoiremod/sounds.json
+modpack/resourcepacks/grimoire_assets/assets/grimoiremod/sounds/**/*.ogg
+modpack/resourcepacks/grimoire_assets/assets/grimoiremod/textures/**/*.png
+modpack/resourcepacks/grimoire_assets/assets/grimoiremod/models/**/*.json
+modpack/resourcepacks/grimoire_assets/data/grimoiremod/structures/**/*.nbt
+
+modpack/mods/*.jar
+!modpack/mods/.gitkeep
+
+modpack/manifest.json
+
+launcher/build/
+launcher/dist/
+launcher/node_modules/
+site/.cache/
+site/public/
+
+*.log
+.patch_backup_*/
+run/
+
+
+# === IDE / build artifacts (added by hand, do not remove) ===
+bin/
+.settings/
+.classpath
+.project
+.idea/
+*.iml
+*.launch
+.vscode/
+
+# === Temp / dump files ===
+d.txt
+project_dump*.txt
+project_dump_part_*.txt
+*.bak.*
+*.orig
+*.rej

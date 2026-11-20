@@ -1,0 +1,1645 @@
+        // При разблокировке сразу ставим 1 уровень
+        CompoundTag levels = tree.getCompound(LEVELS);
+        if (levels.getInt(nodeId) == 0) {
+            levels.putInt(nodeId, 1);
+            tree.put(LEVELS, levels);
+        }
+
+        g.put(KEY, tree);
+        root.put(ROOT, g);
+        GrimoireData.saveRoot(stack, root);
+        return true;
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/data/SkillTreeDef.java -----
+package com.example.grimoiremod.data;
+
+import java.util.List;
+
+public final class SkillTreeDef {
+    public enum NodeType {
+        ROOT, ELEMENT_SELECTOR, ELEMENT_TIER, STAT_BOOST
+    }
+
+    public record Node(String id, String nameKey, int x, int y, int cost, 
+                       List<String> prereqs, int maxLevel, NodeType type) {}
+
+    public static final List<Node> NODES = List.of(
+            // --- ЦЕНТР ---
+            new Node("grimoiremod:root", "gui.grimoiremod.skill.root", 0, 0, 0, List.of(), 1, NodeType.ROOT),
+
+            // --- ВЕТКА СТИХИЙ (Вверх) ---
+            new Node("grimoiremod:mastery_elements", "gui.grimoiremod.skill.mastery_elements", 0, -2, 1, List.of("grimoiremod:root"), 1, NodeType.ELEMENT_SELECTOR),
+            new Node("grimoiremod:element_fire_t1", "gui.grimoiremod.skill.elem.fire", -4, -4, 1, List.of("grimoiremod:mastery_elements"), 100, NodeType.ELEMENT_TIER),
+            new Node("grimoiremod:element_ice_t1", "gui.grimoiremod.skill.elem.ice", -2, -4, 1, List.of("grimoiremod:mastery_elements"), 100, NodeType.ELEMENT_TIER),
+            new Node("grimoiremod:element_water_t1", "gui.grimoiremod.skill.elem.water", 0, -4, 1, List.of("grimoiremod:mastery_elements"), 100, NodeType.ELEMENT_TIER),
+            new Node("grimoiremod:element_lightning_t1", "gui.grimoiremod.skill.elem.lightning", 2, -4, 1, List.of("grimoiremod:mastery_elements"), 100, NodeType.ELEMENT_TIER),
+            new Node("grimoiremod:element_nature_t1", "gui.grimoiremod.skill.elem.nature", 4, -4, 1, List.of("grimoiremod:mastery_elements"), 100, NodeType.ELEMENT_TIER),
+
+            // --- ВЕТКА БОЯ (Вправо) ---
+            new Node("grimoiremod:mastery_combat", "gui.grimoiremod.skill.mastery_combat", 2, 0, 1, List.of("grimoiremod:root"), 1, NodeType.ROOT),
+            new Node("grimoiremod:combat_damage", "gui.grimoiremod.skill.combat.damage", 4, -1, 1, List.of("grimoiremod:mastery_combat"), 100, NodeType.STAT_BOOST),
+            new Node("grimoiremod:combat_radius", "gui.grimoiremod.skill.combat.radius", 4, 1, 1, List.of("grimoiremod:mastery_combat"), 100, NodeType.STAT_BOOST),
+
+            // --- ВЕТКА ПОДДЕРЖКИ (Влево) ---
+            new Node("grimoiremod:mastery_support", "gui.grimoiremod.skill.mastery_support", -2, 0, 1, List.of("grimoiremod:root"), 1, NodeType.ROOT),
+            new Node("grimoiremod:support_heal", "gui.grimoiremod.skill.support.heal", -4, 1, 1, List.of("grimoiremod:mastery_support"), 100, NodeType.STAT_BOOST),
+
+            // --- ВЕТКА УТИЛИТ (Вниз) ---
+            new Node("grimoiremod:mastery_utility", "gui.grimoiremod.skill.mastery_utility", 0, 2, 1, List.of("grimoiremod:root"), 1, NodeType.ROOT),
+            new Node("grimoiremod:utility_cooldown", "gui.grimoiremod.skill.utility.cooldown", 1, 4, 1, List.of("grimoiremod:mastery_utility"), 100, NodeType.STAT_BOOST)
+    );
+
+    private SkillTreeDef() {}
+
+    public static Node byId(String id) {
+        if (id == null) return null;
+        for (Node n : NODES) if (n.id().equals(id)) return n;
+        return null;
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/data/SpellDescriber.java -----
+package com.example.grimoiremod.data;
+
+import com.example.grimoiremod.glyphs.Glyph;
+import com.example.grimoiremod.glyphs.Glyphs;
+import com.example.grimoiremod.glyphs.SpellAggregator;
+import com.example.grimoiremod.glyphs.Stat;
+import com.example.grimoiremod.glyphs.StatBlock;
+import com.example.grimoiremod.glyphs.StatMod;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public final class SpellDescriber {
+    private SpellDescriber() {}
+
+    public static List<Component> describeLines(GlyphPage page) {
+        List<Component> out = new ArrayList<>();
+        if (page == null) return out;
+        if (page.isToc()) {
+            out.add(Component.translatable("gui.grimoiremod.toc").withStyle(ChatFormatting.BOLD));
+            return out;
+        }
+
+        SpellParser.Parsed parsed = SpellParser.parse(page);
+        if (parsed.formId() == null) {
+            out.add(Component.translatable("gui.grimoiremod.no_form").withStyle(ChatFormatting.RED));
+            if (parsed.orphanModifier()) {
+                out.add(Component.translatable("gui.grimoiremod.orphan_modifier").withStyle(ChatFormatting.RED));
+            }
+        } else {
+            StatBlock sb = SpellAggregator.aggregate(page);
+
+            for (SpellParser.Element e : parsed.elements()) {
+                Glyph g = Glyphs.byId(e.instance().typeId());
+                String name = g != null ? g.getDisplayName().getString() : e.instance().typeId();
+                if (g != null && g.advanced()) {
+                    name = Component.translatable("gui.grimoiremod.advanced", name).getString();
+                }
+
+                double baseDmg  = g != null ? g.baseStat(Stat.DAMAGE) : 0;
+                double baseHeal = g != null ? g.baseStat(Stat.HEAL)   : 0;
+
+                if (baseDmg > 0) {
+                    double total = SpellAggregator.elementBaseDamage(e, sb);
+                    ChatFormatting sign = total > 0 ? ChatFormatting.GREEN : (total < 0 ? ChatFormatting.RED : ChatFormatting.WHITE);
+                    int col = g.color() & 0xFFFFFF;
+                    out.add(Component.literal(name + ": ")
+                            .withStyle(style -> style.withColor(col))
+                            .append(Component.translatable("gui.grimoiremod.damage", Stat.trimNumber(total)).withStyle(sign)));
+                } else if (baseHeal > 0) {
+                    double total = SpellAggregator.elementBaseHeal(e, sb);
+                    int col = g.color() & 0xFFFFFF;
+                    out.add(Component.literal(name + ": ")
+                            .withStyle(style -> style.withColor(col))
+                            .append(Component.translatable("gui.grimoiremod.heal", Stat.trimNumber(total)).withStyle(ChatFormatting.GREEN)));
+                } else {
+                    int col = g != null ? (g.color() & 0xFFFFFF) : 0xFFFFFF;
+                    out.add(Component.literal(name).withStyle(style -> style.withColor(col)));
+                }
+            }
+
+            if (!parsed.elements().isEmpty()) out.add(Component.literal(" "));
+            out.add(Component.literal("---").withStyle(ChatFormatting.DARK_GRAY));
+
+            Glyph form = Glyphs.byId(parsed.formId());
+            String formName = form != null ? form.getDisplayName().getString() : parsed.formId();
+            int count = sb.getInt(Stat.COUNT);
+            out.add(Component.translatable("gui.grimoiremod.form", formName + (count > 1 ? " x" + count : ""))
+                    .withStyle(ChatFormatting.BOLD));
+
+            if (parsed.formId().equals("projectile")) {
+                double critChance = sb.get(Stat.CRIT_CHANCE);
+                if (critChance > 0) {
+                    out.add(Component.translatable("gui.grimoiremod.crit_chance", (int)Math.round(critChance * 100))
+                            .withStyle(ChatFormatting.GOLD));
+                }
+                double critMult = sb.get(Stat.CRIT_MULT);
+                if (critMult > 0) {
+                    out.add(Component.translatable("gui.grimoiremod.crit_damage", (int)Math.round(critMult * 100))
+                            .withStyle(ChatFormatting.GOLD));
+                }
+            }
+
+            double cooldown = sb.get(Stat.COOLDOWN);
+            if (cooldown > 0) {
+                out.add(Component.translatable("gui.grimoiremod.cooldown", Stat.trimNumber(cooldown))
+                        .withStyle(ChatFormatting.GRAY));
+            }
+        }
+
+        if (!parsed.errors().isEmpty()) {
+            out.add(Component.literal("---").withStyle(ChatFormatting.DARK_GRAY));
+            out.add(Component.translatable("gui.grimoiremod.errors").withStyle(ChatFormatting.RED));
+            for (var e : parsed.errors().entrySet()) {
+                out.add(Component.literal(" . ").append(Component.translatable(e.getValue())).withStyle(ChatFormatting.RED));
+            }
+        }
+
+        return out;
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/data/SpellParser.java -----
+package com.example.grimoiremod.data;
+
+import com.example.grimoiremod.glyphs.Glyph;
+import com.example.grimoiremod.glyphs.GlyphCategory;
+import com.example.grimoiremod.glyphs.Glyphs;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public final class SpellParser {
+    private SpellParser() {}
+
+    public record Element(GlyphInstance instance, List<String> mods) {}
+
+    public record Parsed(String formId, List<String> formMods, List<Element> elements,
+                         boolean orphanModifier, Map<Integer, String> errors) {}
+
+    public static Parsed parse(GlyphPage page) {
+        if (page == null || page.isToc()) {
+            return new Parsed(null, List.of(), List.of(), false, new HashMap<>());
+        }
+
+        String formId = null;
+        List<String> formMods = new ArrayList<>();
+        List<Element> elements = new ArrayList<>();
+        boolean orphanModifier = false;
+        List<String> activeAnchorMods = null;
+        Map<Integer, String> errors = new HashMap<>();
+
+        for (int i = 0; i < page.slots.length; i++) {
+            GlyphInstance inst = page.slots[i];
+            if (inst == null) continue;
+            Glyph g = Glyphs.byId(inst.typeId());
+            if (g == null) continue;
+
+            if (g.category() == GlyphCategory.FORM) {
+                if (formId == null) {
+                    formId = g.id();
+                    activeAnchorMods = formMods;
+                    if (g.id().equals("fireball")) {
+                        Element e = new Element(inst, new ArrayList<>());
+                        elements.add(e);
+                        activeAnchorMods = e.mods();
+                    }
+                } else {
+                    errors.put(i, "gui.grimoiremod.error.multiple_forms");
+                }
+            } else if (g.category() == GlyphCategory.ELEMENT) {
+                boolean hasElement = false;
+                for (Element e : elements) {
+                    Glyph eg = Glyphs.byId(e.instance().typeId());
+                    if (eg != null && eg.category() == GlyphCategory.ELEMENT) { hasElement = true; break; }
+                }
+                if (!hasElement) {
+                    Element e = new Element(inst, new ArrayList<>());
+                    elements.add(e);
+                    activeAnchorMods = e.mods();
+                } else {
+                    errors.put(i, "gui.grimoiremod.error.multiple_elements");
+                }
+            } else if (g.category() == GlyphCategory.EFFECT) {
+                boolean duplicate = false;
+                for (Element e : elements) {
+                    if (e.instance().typeId().equals(g.id())) { duplicate = true; break; }
+                }
+                if (!duplicate) {
+                    Element e = new Element(inst, new ArrayList<>());
+                    elements.add(e);
+                    activeAnchorMods = e.mods();
+                } else {
+                    errors.put(i, "gui.grimoiremod.error.duplicate_effect");
+                }
+            } else if (g.category() == GlyphCategory.FORM_MODIFIER) {
+                formMods.add(g.id());
+            } else if (g.category() == GlyphCategory.MODIFIER) {
+                if (activeAnchorMods != null) activeAnchorMods.add(g.id());
+                else {
+                    orphanModifier = true;
+                    errors.put(i, "gui.grimoiremod.error.orphan_modifier");
+                }
+            }
+        }
+
+        if (formId == null && page.slots.length > 0) {
+            boolean hasAnyGlyph = false;
+            for (GlyphInstance inst : page.slots) if (inst != null) hasAnyGlyph = true;
+            if (hasAnyGlyph) errors.put(-1, "gui.grimoiremod.error.no_form");
+        }
+
+        return new Parsed(formId, formMods, elements, orphanModifier, errors);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/entity/SpellProjectile.java -----
+package com.example.grimoiremod.entity;
+
+import com.example.grimoiremod.GrimoireMod;
+import com.example.grimoiremod.data.GlyphInstance;
+import com.example.grimoiremod.data.SpellParser;
+import com.example.grimoiremod.glyphs.GrimoireEffects;
+import com.example.grimoiremod.glyphs.Stat;
+import com.example.grimoiremod.glyphs.StatBlock;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+
+public class SpellProjectile extends Projectile {
+    private static final EntityDataAccessor<String> PRIMARY =
+            SynchedEntityData.defineId(SpellProjectile.class, EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<Integer> LIFE =
+            SynchedEntityData.defineId(SpellProjectile.class, EntityDataSerializers.INT);
+
+    private static final int BASE_MAX_LIFE = 100;
+    private static final int MIN_MAX_LIFE = 5;
+    private static final double SPEED = 1.0;
+    private static final int TRAIL_DELAY_TICKS = 3;
+
+    private List<SpellParser.Element> elements = new ArrayList<>();
+    private StatBlock formStats = StatBlock.defaults();
+    private float maxLifeMultiplier = 1.0f;
+    private float critFactor = 1.0f;
+
+    public SpellProjectile(EntityType<? extends SpellProjectile> type, Level level) {
+        super(type, level);
+        setNoGravity(true);
+    }
+
+    public SpellProjectile(Level level, LivingEntity owner,
+                           List<SpellParser.Element> elements,
+                           StatBlock formStats, float critFactor, Vec3 direction) {
+        super(GrimoireMod.SPELL_PROJECTILE.get(), level);
+        setOwner(owner);
+        setNoGravity(true);
+        this.formStats = formStats;
+        this.critFactor = critFactor;
+        this.maxLifeMultiplier = formStats.getFloat(Stat.LIFE);
+        setElements(elements);
+        setPos(owner.getX(), owner.getEyeY() - 0.1, owner.getZ());
+        setDeltaMovement(direction.normalize().scale(SPEED));
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        builder.define(PRIMARY, "");
+        builder.define(LIFE, 0);
+    }
+
+    private int life() { return entityData.get(LIFE); }
+    private void setLife(int v) { entityData.set(LIFE, v); }
+
+    public void setElements(List<SpellParser.Element> els) {
+        this.elements = new ArrayList<>(els);
+        String primary = els.isEmpty() ? "" : els.get(0).instance().typeId();
+        entityData.set(PRIMARY, primary);
+    }
+
+    public String primaryElement() {
+        return entityData.get(PRIMARY);
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+
+        if (level().isClientSide()) {
+            if (life() < TRAIL_DELAY_TICKS) return;
+            spawnTrail();
+            return;
+        }
+
+        setLife(life() + 1);
+        int maxLife = Math.max(MIN_MAX_LIFE, (int)(BASE_MAX_LIFE * maxLifeMultiplier));
+        if (life() > maxLife) { discard(); return; }
+
+        Vec3 from = position();
+        Vec3 to = from.add(getDeltaMovement());
+
+        EntityHitResult entHit = findEntityHit(from, to);
+        if (entHit != null) {
+            if (entHit.getEntity() instanceof LivingEntity target) {
+                for (SpellParser.Element el : elements) {
+                    GrimoireEffects.apply(el, formStats, target, critFactor, getOwner(), this);
+                }
+            }
+            burstParticles();
+            discard();
+            return;
+        }
+
+        HitResult blockHit = level().clip(new ClipContext(from, to,
+                ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+        if (blockHit.getType() != HitResult.Type.MISS) {
+            setPos(blockHit.getLocation());
+            burstParticles();
+            discard();
+            return;
+        }
+
+        setPos(to);
+    }
+
+    private EntityHitResult findEntityHit(Vec3 from, Vec3 to) {
+        EntityHitResult best = null;
+        double bestDist = Double.MAX_VALUE;
+        AABB sweep = getBoundingBox().expandTowards(getDeltaMovement()).inflate(0.5);
+        for (var e : level().getEntities(this, sweep,
+                e -> e instanceof LivingEntity && e != getOwner() && e.isAlive())) {
+            AABB box = e.getBoundingBox().inflate(0.3);
+            var opt = box.clip(from, to);
+            if (opt.isPresent()) {
+                double d = from.distanceToSqr(opt.get());
+                if (d < bestDist) { bestDist = d; best = new EntityHitResult(e, opt.get()); }
+            }
+        }
+        return best;
+    }
+
+    private void spawnTrail() {
+        Vec3 p = position();
+        switch (primaryElement()) {
+            case "fire", "fireball" -> {
+                level().addParticle(ParticleTypes.FLAME, p.x, p.y, p.z, jitter(0.02), jitter(0.02), jitter(0.02));
+                if (random.nextInt(3) == 0)
+                    level().addParticle(ParticleTypes.SMOKE, p.x, p.y, p.z, jitter(0.03), 0.02, jitter(0.03));
+            }
+            case "ice" -> level().addParticle(ParticleTypes.SNOWFLAKE, p.x, p.y, p.z, jitter(0.04), jitter(0.04), jitter(0.04));
+            case "water" -> level().addParticle(ParticleTypes.SPLASH, p.x, p.y, p.z, jitter(0.04), jitter(0.04), jitter(0.04));
+            case "heal" -> level().addParticle(ParticleTypes.HEART, p.x, p.y, p.z, jitter(0.04), jitter(0.04), jitter(0.04));
+            case "speed", "slow" -> level().addParticle(ParticleTypes.ENCHANTED_HIT, p.x, p.y, p.z, jitter(0.04), jitter(0.04), jitter(0.04));
+            default -> level().addParticle(ParticleTypes.CRIT, p.x, p.y, p.z, jitter(0.06), jitter(0.06), jitter(0.06));
+        }
+    }
+
+    private double jitter(double amp) { return (random.nextDouble() - 0.5) * 2 * amp; }
+
+    private void burstParticles() {
+        if (!(level() instanceof ServerLevel sl)) return;
+        Vec3 p = position();
+        switch (primaryElement()) {
+            case "fire", "fireball" -> {
+                sl.sendParticles(ParticleTypes.FLAME, p.x, p.y, p.z, 25, 0.4, 0.4, 0.4, 0.10);
+                sl.sendParticles(ParticleTypes.LAVA,  p.x, p.y, p.z,  6, 0.3, 0.3, 0.3, 0.00);
+                sl.sendParticles(ParticleTypes.SMOKE, p.x, p.y, p.z, 12, 0.4, 0.4, 0.4, 0.04);
+            }
+            case "ice" -> {
+                sl.sendParticles(ParticleTypes.SNOWFLAKE, p.x, p.y, p.z, 25, 0.4, 0.4, 0.4, 0.10);
+                sl.sendParticles(ParticleTypes.CLOUD,     p.x, p.y, p.z, 12, 0.4, 0.4, 0.4, 0.04);
+            }
+            case "water" -> {
+                sl.sendParticles(ParticleTypes.SPLASH, p.x, p.y, p.z, 25, 0.4, 0.4, 0.4, 0.10);
+                sl.sendParticles(ParticleTypes.CLOUD,  p.x, p.y, p.z,  8, 0.4, 0.4, 0.4, 0.04);
+            }
+            case "heal" -> {
+                sl.sendParticles(ParticleTypes.HEART, p.x, p.y, p.z, 12, 0.4, 0.4, 0.4, 0.10);
+                sl.sendParticles(ParticleTypes.HAPPY_VILLAGER, p.x, p.y, p.z, 8, 0.4, 0.4, 0.4, 0.05);
+            }
+            case "speed", "slow" -> sl.sendParticles(ParticleTypes.ENCHANTED_HIT, p.x, p.y, p.z, 20, 0.4, 0.4, 0.4, 0.10);
+            default -> {
+                sl.sendParticles(ParticleTypes.CRIT,          p.x, p.y, p.z, 20, 0.4, 0.4, 0.4, 0.12);
+                sl.sendParticles(ParticleTypes.ENCHANTED_HIT, p.x, p.y, p.z, 10, 0.4, 0.4, 0.4, 0.06);
+            }
+        }
+    }
+
+    @Override
+    protected void readAdditionalSaveData(CompoundTag tag) {
+        entityData.set(PRIMARY, tag.getString("Primary"));
+        setLife(tag.getInt("Life"));
+        this.maxLifeMultiplier = tag.contains("LifeMult") ? tag.getFloat("LifeMult") : 1.0f;
+        this.critFactor = tag.contains("CritFactor") ? tag.getFloat("CritFactor") : 1.0f;
+
+        this.formStats = StatBlock.defaults();
+        if (tag.contains("FormStats")) {
+            CompoundTag fs = tag.getCompound("FormStats");
+            EnumMap<Stat, Double> m = new EnumMap<>(Stat.class);
+            for (Stat s : Stat.values()) {
+                m.put(s, fs.contains(s.name()) ? fs.getDouble(s.name()) : s.defaultValue);
+            }
+            this.formStats = new StatBlock(m);
+        }
+
+        this.elements = new ArrayList<>();
+        ListTag list = tag.getList("Elements", Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); i++) {
+            CompoundTag et = list.getCompound(i);
+            GlyphInstance inst = GlyphInstance.fromNbt(et);
+            List<String> mods = new ArrayList<>();
+            ListTag modList = et.getList("Mods", Tag.TAG_STRING);
+            for (int j = 0; j < modList.size(); j++) mods.add(modList.getString(j));
+            this.elements.add(new SpellParser.Element(inst, mods));
+        }
+    }
+
+    @Override
+    protected void addAdditionalSaveData(CompoundTag tag) {
+        tag.putString("Primary", entityData.get(PRIMARY));
+        tag.putInt("Life", life());
+        tag.putFloat("LifeMult", maxLifeMultiplier);
+        tag.putFloat("CritFactor", critFactor);
+
+        CompoundTag fs = new CompoundTag();
+        for (Stat s : Stat.values()) fs.putDouble(s.name(), formStats.get(s));
+        tag.put("FormStats", fs);
+
+        ListTag list = new ListTag();
+        for (SpellParser.Element e : elements) {
+            CompoundTag et = e.instance().toNbt();
+            ListTag modList = new ListTag();
+            for (String m : e.mods()) modList.add(StringTag.valueOf(m));
+            et.put("Mods", modList);
+            list.add(et);
+        }
+        tag.put("Elements", list);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/Glyph.java -----
+package com.example.grimoiremod.glyphs;
+
+import net.minecraft.network.chat.Component;
+
+import java.util.List;
+import java.util.Set;
+
+public record Glyph(
+        String id,
+        GlyphCategory category,
+        int color,
+        List<StatMod> stats,
+        boolean advanced,
+        Set<Stat> upgradeableStats
+) {
+    public Glyph(String id, GlyphCategory category, int color) {
+        this(id, category, color, List.of(), false, Set.of());
+    }
+    public Glyph(String id, GlyphCategory category, int color, List<StatMod> stats) {
+        this(id, category, color, stats, false, Set.of());
+    }
+    public Glyph(String id, GlyphCategory category, int color, List<StatMod> stats, boolean advanced) {
+        this(id, category, color, stats, advanced, Set.of());
+    }
+
+    public Component getDisplayName() {
+        return Component.translatable("glyph.grimoiremod." + id);
+    }
+
+    public double baseStat(Stat stat) {
+        for (StatMod m : stats) {
+            if (m.stat() == stat && m.phase() == Phase.BASE) return m.value();
+        }
+        return stat.defaultValue;
+    }
+
+    public boolean canUpgrade(Stat stat) {
+        return upgradeableStats.contains(stat);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/GlyphBalance.java -----
+package com.example.grimoiremod.glyphs;
+
+import java.util.List;
+
+import static com.example.grimoiremod.glyphs.Stat.*;
+import static com.example.grimoiremod.glyphs.StatMod.*;
+
+/**
+ * === ТАБЛИЦА БАЛАНСА ===
+ * Меняй числа здесь — больше нигде.
+ *
+ * BASE — задаёт базовое значение (у формы).
+ * ADD  — прибавляется (например, split режет урон).
+ * MULT — умножается (например, focus сужает угол).
+ *
+ * Все статы валидируются через Stat. Если нужен новый стат — добавь в Stat.
+ */
+public final class GlyphBalance {
+    private GlyphBalance() {}
+
+    // ============ ФОРМЫ ============
+    public static final List<StatMod> PROJECTILE = List.of(
+        base(FALLBACK_DAMAGE, 2),
+        base(CRIT_CHANCE,    0.12),
+        base(CRIT_MULT,      0.42),
+        base(COOLDOWN,       1.0),
+        base(COUNT,          1)
+    );
+
+    public static final List<StatMod> SELF = List.of(
+        base(COOLDOWN, 1.0)
+    );
+
+    public static final List<StatMod> TOUCH = List.of(
+        base(COOLDOWN, 1.0)
+    );
+
+    // ============ СТИХИИ ============
+    public static final List<StatMod> FIRE = List.of(
+        base(DAMAGE,   4),
+        base(DURATION, 5.0)   // поджог, сек
+    );
+
+    public static final List<StatMod> ICE = List.of(
+        base(DAMAGE,   2),
+        base(DURATION, 10.0)  // замедление, сек
+    );
+
+    public static final List<StatMod> WATER = List.of(
+        base(DAMAGE,   1),
+        base(DURATION, 4.0)   // wet, сек
+    );
+
+    // ============ ЭФФЕКТЫ ============
+    public static final List<StatMod> HEAL = List.of(
+        base(Stat.HEAL, 4)
+    );
+
+    public static final List<StatMod> SPEED = List.of(
+        base(DURATION, 10.0)
+    );
+
+    public static final List<StatMod> SLOW = List.of(
+        base(DURATION, 10.0)
+    );
+
+    // ============ МОДИФИКАТОРЫ ЭЛЕМЕНТА ============
+    public static final List<StatMod> BIGGER = List.of(
+        add(DAMAGE, 2)
+    );
+
+    // ============ МОДИФИКАТОРЫ ФОРМЫ ============
+    public static final List<StatMod> SPLIT = List.of(
+        add(COUNT,        1),
+        add(DAMAGE_BONUS, -2)
+    );
+
+    public static final List<StatMod> FOCUS = List.of(
+        mult(ANGLE,       0.3),
+        add(DAMAGE_BONUS, 1)
+    );
+
+    public static final List<StatMod> SPREAD = List.of(
+        mult(ANGLE,       2.0),
+        mult(LIFE,        0.1),
+        add(DAMAGE_BONUS, 2)
+    );
+
+    // ============ РАЗВИТЫЕ ГЛИФЫ ============
+    public static final List<StatMod> FIREBALL = List.of(
+        base(FALLBACK_DAMAGE, 2),
+        base(CRIT_CHANCE,    0.15),
+        base(CRIT_MULT,      0.5),
+        base(COOLDOWN,       1.2),
+        base(COUNT,          1),
+        base(DAMAGE,         6),
+        base(DURATION,       5.0)
+    );
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/GlyphCategory.java -----
+package com.example.grimoiremod.glyphs;
+
+public enum GlyphCategory {
+    FORM,
+    ELEMENT,
+    EFFECT,
+    MODIFIER,
+    FORM_MODIFIER
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/Glyphs.java -----
+package com.example.grimoiremod.glyphs;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+
+public final class Glyphs {
+    private static final Map<String, Glyph> BY_ID = new LinkedHashMap<>();
+
+    public static final Glyph PROJECTILE = reg(new Glyph("projectile", GlyphCategory.FORM, 0xFFCC4444, GlyphBalance.PROJECTILE, false, Set.of(Stat.COOLDOWN)));
+    public static final Glyph SELF       = reg(new Glyph("self",       GlyphCategory.FORM, 0xFF4444CC, GlyphBalance.SELF, false, Set.of(Stat.COOLDOWN)));
+    public static final Glyph TOUCH      = reg(new Glyph("touch",      GlyphCategory.FORM, 0xFF44CC44, GlyphBalance.TOUCH, false, Set.of(Stat.COOLDOWN)));
+    
+    public static final Glyph FIRE       = reg(new Glyph("fire",       GlyphCategory.ELEMENT, 0xFFFFA500, GlyphBalance.FIRE, false, Set.of(Stat.DAMAGE)));
+    public static final Glyph ICE        = reg(new Glyph("ice",        GlyphCategory.ELEMENT, 0xFF6AD4FF, GlyphBalance.ICE, false, Set.of(Stat.DAMAGE)));
+    public static final Glyph WATER      = reg(new Glyph("water",      GlyphCategory.ELEMENT, 0xFF3A9AE8, GlyphBalance.WATER, false, Set.of(Stat.DAMAGE)));
+    
+    public static final Glyph HEAL       = reg(new Glyph("heal",       GlyphCategory.EFFECT, 0xFF66DD66, GlyphBalance.HEAL, false, Set.of(Stat.HEAL)));
+    public static final Glyph SPEED      = reg(new Glyph("speed",      GlyphCategory.EFFECT, 0xFF55AA88, GlyphBalance.SPEED, false, Set.of()));
+    public static final Glyph SLOW       = reg(new Glyph("slow",       GlyphCategory.EFFECT, 0xFF5588AA, GlyphBalance.SLOW, false, Set.of()));
+    
+    public static final Glyph BIGGER     = reg(new Glyph("bigger",     GlyphCategory.MODIFIER, 0xFFAA44AA, GlyphBalance.BIGGER));
+    public static final Glyph SPLIT      = reg(new Glyph("split",      GlyphCategory.FORM_MODIFIER, 0xFFAA8844, GlyphBalance.SPLIT));
+    public static final Glyph FOCUS      = reg(new Glyph("focus",      GlyphCategory.FORM_MODIFIER, 0xFF4477CC, GlyphBalance.FOCUS));
+    public static final Glyph SPREAD     = reg(new Glyph("spread",     GlyphCategory.FORM_MODIFIER, 0xFFCC7733, GlyphBalance.SPREAD));
+    
+    public static final Glyph FIREBALL   = reg(new Glyph("fireball",   GlyphCategory.FORM, 0xFFFF4500, GlyphBalance.FIREBALL, true, Set.of(Stat.DAMAGE)));
+
+    private static Glyph reg(Glyph g) { BY_ID.put(g.id(), g); return g; }
+    private Glyphs() {}
+
+    public static Glyph byId(String id) { return id == null ? null : BY_ID.get(id); }
+    public static Collection<Glyph> all() { return Collections.unmodifiableCollection(BY_ID.values()); }
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/GrimoireEffects.java -----
+package com.example.grimoiremod.glyphs;
+
+import com.example.grimoiremod.GrimoireMod;
+import com.example.grimoiremod.data.SpellParser;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+
+public final class GrimoireEffects {
+    private GrimoireEffects() {}
+
+    public static void apply(SpellParser.Element element, StatBlock formStats,
+                             LivingEntity target, float critFactor, Entity caster, Entity directEntity) {
+        if (element == null || formStats == null || target == null) return;
+        String id = element.instance().typeId();
+        Glyph g = Glyphs.byId(id);
+        if (g == null) return;
+
+        // СТАВИМ NBT МЕТКУ (чтобы отследить убийство даже после горения)
+        if (caster != null) {
+            target.getPersistentData().putString("GrimoireLastElement", id);
+            target.getPersistentData().putUUID("GrimoireLastOwner", caster.getUUID());
+        }
+
+        int biggerCount = 0;
+        for (String m : element.mods()) if ("bigger".equals(m)) biggerCount++;
+
+        double baseDamage = SpellAggregator.elementBaseDamage(element, formStats);
+        double baseHeal   = SpellAggregator.elementBaseHeal(element, formStats);
+        int durationTicks = (int)Math.round(g.baseStat(Stat.DURATION) * 20.0);
+
+        float finalDamage = (float)(baseDamage * critFactor);
+        float finalHeal   = (float)(baseHeal   * critFactor);
+
+        DamageSource ds = caster != null 
+                ? target.damageSources().indirectMagic(caster, directEntity != null ? directEntity : caster)
+                : target.damageSources().magic();
+
+        switch (id) {
+            case "fire", "fireball" -> {
+                if (finalDamage > 0) target.hurt(ds, finalDamage);
+                target.setRemainingFireTicks(Math.max(target.getRemainingFireTicks(), durationTicks));
+            }
+            case "ice" -> {
+                if (finalDamage > 0) target.hurt(ds, finalDamage);
+                target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, durationTicks, 0));
+            }
+            case "water" -> {
+                if (finalDamage > 0) target.hurt(ds, finalDamage);
+                target.setRemainingFireTicks(0);
+                target.addEffect(new MobEffectInstance(GrimoireMod.WET, durationTicks, 0));
+                if (target.level() instanceof ServerLevel sl) {
+                    sl.sendParticles(ParticleTypes.SPLASH,
+                            target.getX(), target.getY() + target.getBbHeight() * 0.5, target.getZ(),
+                            12, 0.3, 0.3, 0.3, 0.05);
+                }
+            }
+            case "heal" -> {
+                if (finalHeal > 0) target.heal(finalHeal);
+                if (target.level() instanceof ServerLevel sl) {
+                    sl.sendParticles(ParticleTypes.HEART,
+                            target.getX(), target.getY() + target.getBbHeight() * 0.5, target.getZ(),
+                            4, 0.3, 0.3, 0.3, 0.05);
+                }
+            }
+            case "speed" -> target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SPEED, durationTicks, Math.max(0, biggerCount)));
+            case "slow" -> target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, durationTicks, Math.max(0, biggerCount)));
+        }
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/Phase.java -----
+package com.example.grimoiremod.glyphs;
+
+/**
+ * Фаза модификатора стата.
+ * BASE — задаёт базовое значение (перезаписывает default).
+ * ADD  — прибавляется к текущему (суммируются все ADD).
+ * MULT — умножается на текущее (перемножаются все MULT).
+ *
+ * Порядок применения: BASE → сумма ADD → произведение MULT.
+ */
+public enum Phase {
+    BASE, ADD, MULT
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/SpellAggregator.java -----
+package com.example.grimoiremod.glyphs;
+
+import com.example.grimoiremod.data.GlyphInstance;
+import com.example.grimoiremod.data.GlyphPage;
+import com.example.grimoiremod.data.SpellParser;
+
+import java.util.EnumMap;
+import java.util.List;
+
+/**
+ * Единственный источник правды по урону/лечению.
+ * Формовые статы (через StatBlock) и поэлементные (через elementBase*).
+ */
+public final class SpellAggregator {
+    private static final int MAX_SPLIT = 2;
+    private SpellAggregator() {}
+
+    public static StatBlock aggregate(GlyphPage page) {
+        if (page == null || page.isToc()) return StatBlock.defaults();
+
+        SpellParser.Parsed parsed = SpellParser.parse(page);
+        if (parsed.formId() == null) return StatBlock.defaults();
+        Glyph form = Glyphs.byId(parsed.formId());
+        if (form == null) return StatBlock.defaults();
+
+        int splitCount = 0, focusCount = 0, spreadCount = 0;
+        for (String modId : parsed.formMods()) {
+            switch (modId) {
+                case "split"  -> splitCount++;
+                case "focus"  -> focusCount++;
+                case "spread" -> spreadCount++;
+            }
+        }
+        splitCount = Math.min(splitCount, MAX_SPLIT);
+        if (focusCount > 0 && spreadCount > 0) { focusCount = 0; spreadCount = 0; }
+
+        EnumMap<Stat, Double> stats = new EnumMap<>(Stat.class);
+        for (Stat s : Stat.values()) stats.put(s, s.defaultValue);
+
+        applyBase(stats, form.stats());
+        applyModifier(stats, "split",  splitCount);
+        applyModifier(stats, "focus",  focusCount);
+        applyModifier(stats, "spread", spreadCount);
+
+        // Применяем вложенные очки характеристик от глифа формы
+        GlyphInstance formInst = null;
+        for (GlyphInstance inst : page.slots) {
+            if (inst != null && inst.typeId().equals(parsed.formId())) {
+                formInst = inst;
+                break;
+            }
+        }
+        
+        if (formInst != null) {
+            // Перезарядка: каждое очко уменьшает время на 0.05 сек
+            int cdPoints = formInst.getPoints(Stat.COOLDOWN);
+            if (cdPoints > 0) {
+                double baseCd = stats.get(Stat.COOLDOWN);
+                stats.put(Stat.COOLDOWN, Math.max(0.1, baseCd - cdPoints * 0.05));
+            }
+            // Сюда в будущем можно добавить другие статы формы, если нужно
+        }
+
+        return new StatBlock(stats);
+    }
+
+    private static void applyBase(EnumMap<Stat, Double> stats, List<StatMod> mods) {
+        for (StatMod m : mods) {
+            if (m.phase() == Phase.BASE) stats.put(m.stat(), m.value());
+        }
+    }
+
+    private static void applyModifier(EnumMap<Stat, Double> stats, String glyphId, int count) {
+        if (count <= 0) return;
+        Glyph g = Glyphs.byId(glyphId);
+        if (g == null) return;
+        for (int i = 0; i < count; i++) {
+            for (StatMod m : g.stats()) {
+                if (m.phase() == Phase.ADD) {
+                    stats.merge(m.stat(), m.value(), Double::sum);
+                } else if (m.phase() == Phase.MULT) {
+                    stats.merge(m.stat(), m.value(), (a, b) -> a * b);
+                }
+            }
+        }
+    }
+
+    /** Сумма ADD DAMAGE от модификаторов элемента (generic, не только bigger). */
+    public static double elementModDamageBonus(SpellParser.Element e) {
+        double bonus = 0;
+        for (String m : e.mods()) {
+            Glyph mg = Glyphs.byId(m);
+            if (mg == null) continue;
+            for (StatMod sm : mg.stats()) {
+                if (sm.stat() == Stat.DAMAGE && sm.phase() == Phase.ADD) bonus += sm.value();
+            }
+        }
+        return bonus;
+    }
+
+    /** Итоговый урон элемента ДО крита: base + моды + поинты + DAMAGE_BONUS формы. */
+    public static double elementBaseDamage(SpellParser.Element e, StatBlock formStats) {
+        Glyph g = Glyphs.byId(e.instance().typeId());
+        if (g == null) return 0;
+        return g.baseStat(Stat.DAMAGE)
+             + elementModDamageBonus(e)
+             + e.instance().getPoints(Stat.DAMAGE)
+             + formStats.get(Stat.DAMAGE_BONUS);
+    }
+
+    /** Итоговое лечение элемента ДО крита. */
+    public static double elementBaseHeal(SpellParser.Element e, StatBlock formStats) {
+        Glyph g = Glyphs.byId(e.instance().typeId());
+        if (g == null) return 0;
+        return g.baseStat(Stat.HEAL)
+             + e.instance().getPoints(Stat.HEAL)
+             + formStats.get(Stat.DAMAGE_BONUS);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/Stat.java -----
+package com.example.grimoiremod.glyphs;
+
+import net.minecraft.network.chat.Component;
+
+public enum Stat {
+    FALLBACK_DAMAGE(Kind.NUMBER,  2.0),
+    CRIT_CHANCE    (Kind.PERCENT, 0.0),
+    CRIT_MULT      (Kind.PERCENT, 0.0),
+    COOLDOWN       (Kind.SECONDS, 1.0),
+    COUNT          (Kind.INT,     1.0),
+    ANGLE          (Kind.MULT,    1.0),
+    LIFE           (Kind.MULT,    1.0),
+    DAMAGE_BONUS   (Kind.NUMBER,  0.0),
+    DAMAGE         (Kind.NUMBER,  0.0),
+    HEAL           (Kind.NUMBER,  0.0),
+    DURATION       (Kind.SECONDS, 0.0);
+
+    public enum Kind { NUMBER, INT, PERCENT, SECONDS, MULT }
+
+    public final Kind kind;
+    public final double defaultValue;
+
+    Stat(Kind kind, double defaultValue) {
+        this.kind = kind;
+        this.defaultValue = defaultValue;
+    }
+
+    public Component getDisplayName() {
+        return Component.translatable("stat.grimoiremod." + name().toLowerCase());
+    }
+
+    public String format(double value, Phase phase) {
+        String prefix = "";
+        String body;
+        switch (kind) {
+            case NUMBER -> {
+                if (phase == Phase.ADD && value >= 0) prefix = "+";
+                body = trimNumber(value);
+            }
+            case INT -> {
+                if (phase == Phase.ADD && value >= 0) prefix = "+";
+                body = String.valueOf((int)Math.round(value));
+            }
+            case PERCENT -> {
+                int pct = (int)Math.round(value * 100);
+                if (phase == Phase.ADD && pct >= 0) prefix = "+";
+                body = pct + "%";
+            }
+            case SECONDS -> {
+                if (phase == Phase.ADD && value >= 0) prefix = "+";
+                body = trimNumber(value) + "s";
+            }
+            case MULT -> {
+                prefix = "x";
+                body = trimNumber(value);
+            }
+            default -> body = String.valueOf(value);
+        }
+        return prefix + body;
+    }
+
+    // для целых — без хвоста, для дробных — до 2 знаков
+    public static String trimNumber(double v) {
+        if (v == Math.rint(v) && Math.abs(v) < 1e15) return String.valueOf((long)v);
+        String s = String.format("%.2f", v);
+        s = s.replaceAll("\\.?0+$", "");
+        return s;
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/StatBlock.java -----
+package com.example.grimoiremod.glyphs;
+
+import java.util.EnumMap;
+
+/** Результат агрегации. Читается одним способом везде: в бою, в тултипах, в Итоге. */
+public final class StatBlock {
+    private final EnumMap<Stat, Double> values;
+
+    public StatBlock(EnumMap<Stat, Double> values) { this.values = values; }
+
+    public static StatBlock defaults() {
+        EnumMap<Stat, Double> m = new EnumMap<>(Stat.class);
+        for (Stat s : Stat.values()) m.put(s, s.defaultValue);
+        return new StatBlock(m);
+    }
+
+    public double get(Stat s) { return values.getOrDefault(s, s.defaultValue); }
+    public int    getInt(Stat s)   { return (int)Math.round(get(s)); }
+    public float  getFloat(Stat s) { return (float)get(s); }
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/StatMod.java -----
+package com.example.grimoiremod.glyphs;
+
+import net.minecraft.network.chat.Component;
+
+public record StatMod(Stat stat, Phase phase, double value) {
+
+    public static StatMod base(Stat s, double v) { return new StatMod(s, Phase.BASE, v); }
+    public static StatMod add(Stat s, double v)  { return new StatMod(s, Phase.ADD,  v); }
+    public static StatMod mult(Stat s, double v) { return new StatMod(s, Phase.MULT, v); }
+
+    /** Строка для тултипа: "Урон: 4", "Крит шанс: +12%", "Угол: ×0.3". */
+    public Component tooltip() {
+        return Component.empty()
+                .append(stat.getDisplayName())
+                .append(": " + stat.format(value, phase));
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/glyphs/WetEffect.java -----
+package com.example.grimoiremod.glyphs;
+
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectCategory;
+
+public class WetEffect extends MobEffect {
+    public WetEffect() {
+        super(MobEffectCategory.HARMFUL, 0xFF3A9AE8);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/GrimoireCommand.java -----
+package com.example.grimoiremod;
+
+import com.example.grimoiremod.data.GrimoireData;
+import com.example.grimoiremod.data.SkillTreeData;
+import com.example.grimoiremod.item.GrimoireItem;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+
+@EventBusSubscriber(modid = GrimoireMod.MOD_ID)
+public class GrimoireCommand {
+    @SubscribeEvent
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        event.getDispatcher().register(Commands.literal("glyphtest")
+            .then(Commands.argument("type", StringArgumentType.string())
+            .then(Commands.argument("points", IntegerArgumentType.integer(0, 50))
+            .executes(ctx -> {
+                ServerPlayer player = ctx.getSource().getPlayerOrException();
+                String type = StringArgumentType.getString(ctx, "type");
+                int points = IntegerArgumentType.getInteger(ctx, "points");
+                ItemStack stack = new ItemStack(GrimoireMod.GRIMOIRE.get());
+                GrimoireData.debugGiveTestBook(stack, type, points);
+                player.getInventory().add(stack);
+                return 1;
+            }))));
+
+        event.getDispatcher().register(Commands.literal("grimoiredel")
+            .requires(src -> src.hasPermission(2))
+            .executes(ctx -> {
+                ServerPlayer player = ctx.getSource().getPlayerOrException();
+                boolean found = false;
+                for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+                    if (player.getInventory().getItem(i).getItem() instanceof GrimoireItem) {
+                        player.getInventory().removeItem(i, 1);
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    player.sendSystemMessage(
+                            Component.translatable("gui.grimoiremod.command.grimoire_removed")
+                                    .withStyle(ChatFormatting.GREEN));
+                } else {
+                    player.sendSystemMessage(
+                            Component.translatable("gui.grimoiremod.command.grimoire_not_found")
+                                    .withStyle(ChatFormatting.RED));
+                }
+                return 1;
+            }));
+
+        event.getDispatcher().register(Commands.literal("grimoire")
+            .then(Commands.literal("mastery")
+                .requires(src -> src.hasPermission(2))
+                .then(Commands.argument("amount", IntegerArgumentType.integer(1, 100000))
+                    .executes(ctx -> {
+                        ServerPlayer player = ctx.getSource().getPlayerOrException();
+                        int amount = IntegerArgumentType.getInteger(ctx, "amount");
+                        ItemStack stack = player.getMainHandItem();
+                        if (!(stack.getItem() instanceof GrimoireItem)) {
+                            player.sendSystemMessage(
+                                    Component.translatable("gui.grimoiremod.command.need_grimoire_in_hand")
+                                            .withStyle(ChatFormatting.RED));
+                            return 0;
+                        }
+                        int total = SkillTreeData.addPoints(stack, amount);
+                        player.containerMenu.broadcastChanges();
+                        player.sendSystemMessage(
+                                Component.translatable("gui.grimoiremod.command.mastery_added", amount, total)
+                                        .withStyle(ChatFormatting.GREEN));
+                        return 1;
+                    }))));
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/GrimoireMod.java -----
+package com.example.grimoiremod;
+
+import com.example.grimoiremod.block.GlyphWorkbenchBlock;
+import com.example.grimoiremod.entity.SpellProjectile;
+import com.example.grimoiremod.glyphs.WetEffect;
+import com.example.grimoiremod.item.CreativeGrimoireItem;
+import com.example.grimoiremod.item.GrimoireItem;
+import com.example.grimoiremod.menu.GlyphWorkbenchMenu;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.Block;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
+import net.neoforged.neoforge.registries.DeferredHolder;
+import net.neoforged.neoforge.registries.DeferredItem;
+import net.neoforged.neoforge.registries.DeferredRegister;
+
+@Mod(GrimoireMod.MOD_ID)
+public class GrimoireMod {
+    public static final String MOD_ID = "grimoiremod";
+
+    public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MOD_ID);
+    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(Registries.BLOCK, MOD_ID);
+    public static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(Registries.ENTITY_TYPE, MOD_ID);
+    public static final DeferredRegister<MobEffect> EFFECTS = DeferredRegister.create(Registries.MOB_EFFECT, MOD_ID);
+    public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, MOD_ID);
+
+    public static final DeferredItem<GrimoireItem> GRIMOIRE =
+            ITEMS.register("grimoire", () -> new GrimoireItem(new Item.Properties().stacksTo(1)));
+
+    public static final DeferredItem<CreativeGrimoireItem> CREATIVE_GRIMOIRE =
+            ITEMS.register("creative_grimoire", () -> new CreativeGrimoireItem(new Item.Properties().stacksTo(1)));
+
+    public static final DeferredHolder<Block, Block> GLYPH_WORKBENCH = BLOCKS.register("glyph_workbench",
+            () -> new GlyphWorkbenchBlock(GlyphWorkbenchBlock.defaultProps()));
+
+    public static final DeferredItem<BlockItem> GLYPH_WORKBENCH_ITEM = ITEMS.register("glyph_workbench",
+            () -> new BlockItem(GLYPH_WORKBENCH.get(), new Item.Properties()));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<GlyphWorkbenchMenu>> GLYPH_WORKBENCH_MENU =
+            MENUS.register("glyph_workbench", () -> IMenuTypeExtension.create(
+                    (id, inv, buf) -> new GlyphWorkbenchMenu(id, inv, buf.readVarInt())));
+
+    public static final DeferredHolder<EntityType<?>, EntityType<SpellProjectile>> SPELL_PROJECTILE =
+            ENTITIES.register("spell_projectile", () -> EntityType.Builder
+                    .<SpellProjectile>of(SpellProjectile::new, MobCategory.MISC)
+                    .sized(0.4f, 0.4f)
+                    .clientTrackingRange(4)
+                    .updateInterval(1)
+                    .build(MOD_ID + ":spell_projectile"));
+
+    public static final DeferredHolder<MobEffect, MobEffect> WET =
+            EFFECTS.register("wet", WetEffect::new);
+
+    public GrimoireMod(IEventBus modEventBus) {
+        BLOCKS.register(modEventBus);
+        ITEMS.register(modEventBus);
+        ENTITIES.register(modEventBus);
+        EFFECTS.register(modEventBus);
+        MENUS.register(modEventBus);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/item/CreativeGrimoireItem.java -----
+package com.example.grimoiremod.item;
+
+import net.minecraft.world.item.Item;
+
+public class CreativeGrimoireItem extends GrimoireItem {
+    public CreativeGrimoireItem(Item.Properties props) {
+        super(props);
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/item/GrimoireItem.java -----
+package com.example.grimoiremod.item;
+
+import com.example.grimoiremod.data.GlyphPage;
+import com.example.grimoiremod.data.GrimoireData;
+import com.example.grimoiremod.data.SkillTreeData;
+import com.example.grimoiremod.data.SpellParser;
+import com.example.grimoiremod.entity.SpellProjectile;
+import com.example.grimoiremod.glyphs.GrimoireEffects;
+import com.example.grimoiremod.glyphs.SpellAggregator;
+import com.example.grimoiremod.glyphs.Stat;
+import com.example.grimoiremod.glyphs.StatBlock;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResultHolder;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.List;
+
+public class GrimoireItem extends Item {
+    private static final float BASE_SPREAD_PER_SPLIT = 0.15f;
+
+    public GrimoireItem(Properties props) { super(props); }
+
+    @Override
+    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (player.isSpectator()) return InteractionResultHolder.pass(stack);
+        if (!level.isClientSide) {
+            float cd = cast(level, player, stack);
+            if (cd > 0f) player.getCooldowns().addCooldown(this, Math.max(1, (int)(cd * 20)));
+        }
+        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+    }
+
+    private float cast(Level level, Player player, ItemStack stack) {
+        int active = GrimoireData.getActivePage(stack);
+        GlyphPage page = GrimoireData.getPage(stack, active);
+
+        SpellParser.Parsed parsed = SpellParser.parse(page);
+        if (parsed.formId() == null) return 0f;
+
+        StatBlock sb = SpellAggregator.aggregate(page);
+        List<SpellParser.Element> elements = parsed.elements();
+
+        switch (parsed.formId()) {
+            case "projectile", "fireball" -> castProjectile(level, player, sb, elements);
+            case "self"       -> castSelf(player, sb, elements);
+            case "touch"      -> castTouch(level, player, sb, elements);
+        }
+        
+        // Перезарядка теперь полностью высчитывается внутри SpellAggregator
+        return sb.getFloat(Stat.COOLDOWN);
+    }
+
+    private void castProjectile(Level level, Player player, StatBlock sb, List<SpellParser.Element> elements) {
+        int count = sb.getInt(Stat.COUNT);
+        float angle = sb.getFloat(Stat.ANGLE);
+        float spreadPerSplit = BASE_SPREAD_PER_SPLIT * angle;
+        float critFactor = rollCrit(player, sb);
+        Vec3 look = player.getLookAngle();
+        for (int i = 0; i < count; i++) {
+            double yawOffset = (i - (count - 1) / 2.0) * spreadPerSplit;
+            Vec3 dir = look.yRot((float) yawOffset);
+            level.addFreshEntity(new SpellProjectile(level, player, elements, sb, critFactor, dir));
+        }
+    }
+
+    private void castSelf(Player player, StatBlock sb, List<SpellParser.Element> elements) {
+        float critFactor = rollCrit(player, sb);
+        for (SpellParser.Element e : elements) GrimoireEffects.apply(e, sb, player, critFactor, player, null);
+    }
+
+    private void castTouch(Level level, Player player, StatBlock sb, List<SpellParser.Element> elements) {
+        AABB box = player.getBoundingBox().inflate(3);
+        List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, box, e -> e != player);
+        if (targets.isEmpty()) return;
+        LivingEntity closest = null;
+        double best = Double.MAX_VALUE;
+        for (LivingEntity t : targets) {
+            double d = t.distanceToSqr(player);
+            if (d < best) { best = d; closest = t; }
+        }
+        if (closest == null) return;
+        float critFactor = rollCrit(player, sb);
+        for (SpellParser.Element e : elements) GrimoireEffects.apply(e, sb, closest, critFactor, player, null);
+    }
+
+    private static float rollCrit(Player player, StatBlock sb) {
+        boolean crit = player.getRandom().nextFloat() < sb.getFloat(Stat.CRIT_CHANCE);
+        return crit ? (1f + sb.getFloat(Stat.CRIT_MULT)) : 1f;
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/menu/GlyphWorkbenchMenu.java -----
+package com.example.grimoiremod.menu;
+
+import com.example.grimoiremod.GrimoireMod;
+import com.example.grimoiremod.item.GrimoireItem;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
+
+public class GlyphWorkbenchMenu extends AbstractContainerMenu {
+    private final Player player;
+    private final int grimoireSlotIndex;
+
+    public GlyphWorkbenchMenu(int id, Inventory playerInventory, int grimoireSlotIndex) {
+        super(GrimoireMod.GLYPH_WORKBENCH_MENU.get(), id);
+        this.player = playerInventory.player;
+        this.grimoireSlotIndex = grimoireSlotIndex;
+
+        this.addSlot(new Slot(playerInventory, grimoireSlotIndex >= 0 ? grimoireSlotIndex : 0, 20, 20) {
+            @Override public boolean mayPlace(ItemStack stack) { return false; }
+            @Override public boolean mayPickup(Player p) { return false; }
+            @Override public boolean isActive() { return grimoireSlotIndex >= 0; }
+        });
+    }
+
+    public ItemStack getGrimoire() {
+        if (grimoireSlotIndex < 0 || grimoireSlotIndex >= player.getInventory().getContainerSize()) return ItemStack.EMPTY;
+        return player.getInventory().getItem(grimoireSlotIndex);
+    }
+
+    public int getGrimoireSlot() { return grimoireSlotIndex; }
+
+    @Override public ItemStack quickMoveStack(Player player, int index) { return ItemStack.EMPTY; }
+
+    @Override
+    public boolean stillValid(Player player) {
+        if (grimoireSlotIndex < 0 || grimoireSlotIndex >= player.getInventory().getContainerSize()) return false;
+        return player.getInventory().getItem(grimoireSlotIndex).getItem() instanceof GrimoireItem;
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/ModEvents.java -----
+package com.example.grimoiremod;
+
+import com.example.grimoiremod.data.SkillTreeData;
+import com.example.grimoiremod.entity.SpellProjectile;
+import com.example.grimoiremod.item.GrimoireItem;
+import com.example.grimoiremod.util.GrimoireLocator;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+
+import java.util.UUID;
+
+@EventBusSubscriber(modid = GrimoireMod.MOD_ID)
+public class ModEvents {
+
+    private static final String SAVED_GRIMOIRE = "SavedGrimoire";
+
+    @SubscribeEvent
+    public static void addToCreativeTab(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            event.accept(GrimoireMod.GRIMOIRE);
+            event.accept(GrimoireMod.CREATIVE_GRIMOIRE);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onItemToss(ItemTossEvent event) {
+        if (!(event.getEntity().getItem().getItem() instanceof GrimoireItem)) return;
+        if (event.getEntity().getTarget() == null) {
+            if (event.getPlayer().getInventory().add(event.getEntity().getItem())) {
+                event.setCanceled(true);
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onLivingDeath(LivingDeathEvent event) {
+        LivingEntity deadEntity = event.getEntity();
+        if (deadEntity.level().isClientSide()) return;
+
+        ServerPlayer player = null;
+        String element = null;
+
+        // 1. Проверяем прямой удар снарядом
+        Entity direct = event.getSource().getDirectEntity();
+        if (direct instanceof SpellProjectile proj) {
+            if (proj.getOwner() instanceof ServerPlayer p) {
+                player = p;
+                element = proj.primaryElement();
+            }
+        } 
+        // 2. Если умер от горения/яда — читаем NBT метку
+        else {
+            CompoundTag data = deadEntity.getPersistentData();
+            if (data.contains("GrimoireLastOwner")) {
+                UUID ownerUUID = data.getUUID("GrimoireLastOwner");
+                player = deadEntity.getServer().getPlayerList().getPlayer(ownerUUID);
+                element = data.getString("GrimoireLastElement");
+            }
+        }
+
+        if (player == null || element == null || element.isEmpty()) return;
+
+        String elementId = element.equals("fireball") ? "fire" : element;
+        String nodeId = "grimoiremod:element_" + elementId + "_t1";
+
+        int slot = GrimoireLocator.findFirst(player);
+        if (slot < 0) {
+            player.sendSystemMessage(Component.literal("§c[DEBUG] Гримуар не найден в инвентаре!"));
+            return;
+        }
+        
+        ItemStack stack = player.getInventory().getItem(slot);
+        if (!(stack.getItem() instanceof GrimoireItem)) return;
+
+        if (!SkillTreeData.isUnlocked(stack, nodeId)) {
+            player.sendSystemMessage(Component.literal("§c[DEBUG] Узел " + elementId + " не изучен!"));
+            return;
+        }
+
+        float freeMastery = 0.1f;
+        float nodeExp = 0.9f;
+
+        SkillTreeData.addNodeExp(stack, nodeId, nodeExp, 100);
+        SkillTreeData.addPoints(stack, freeMastery);
+        
+        player.getInventory().setChanged();
+        player.containerMenu.broadcastChanges();
+
+        player.sendSystemMessage(Component.literal("§a+0.1 mastery (" + elementId + ")"), true);
+    }
+
+    @SubscribeEvent
+    public static void onLivingDrops(LivingDropsEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        event.getDrops().removeIf(drop -> {
+            if (drop.getItem().getItem() instanceof GrimoireItem) {
+                Tag tag = drop.getItem().save(player.level().registryAccess());
+                CompoundTag wrapper = new CompoundTag();
+                wrapper.put("Item", tag);
+                player.getPersistentData().put(SAVED_GRIMOIRE, wrapper);
+                return true;
+            }
+            return false;
+        });
+    }
+
+    @SubscribeEvent
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        if (!event.isWasDeath()) return;
+        CompoundTag data = event.getOriginal().getPersistentData();
+        if (data.contains(SAVED_GRIMOIRE)) {
+            CompoundTag wrapper = data.getCompound(SAVED_GRIMOIRE);
+            Tag itemTag = wrapper.get("Item");
+            if (itemTag != null) {
+                ItemStack saved = ItemStack.CODEC.parse(
+                        event.getEntity().level().registryAccess().createSerializationContext(NbtOps.INSTANCE),
+                        itemTag
+                ).result().orElse(ItemStack.EMPTY);
+                if (!saved.isEmpty()) {
+                    event.getEntity().getInventory().add(saved);
+                }
+            }
+            data.remove(SAVED_GRIMOIRE);
+        }
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/network/AllocatePointPacket.java -----
+package com.example.grimoiremod.network;
+
+import com.example.grimoiremod.data.GrimoireData;
+import com.example.grimoiremod.glyphs.Stat;
+import com.example.grimoiremod.item.GrimoireItem;
+import com.example.grimoiremod.menu.GlyphWorkbenchMenu;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+
+public record AllocatePointPacket(int itemSlot, int pageIdx, int slotIdx, Stat stat, int delta, boolean isBank)
+        implements CustomPacketPayload {
+
+    public static final Type<AllocatePointPacket> TYPE =
+            new Type<>(ResourceLocation.fromNamespaceAndPath("grimoiremod", "allocate_point"));
+
+    public static final StreamCodec<FriendlyByteBuf, AllocatePointPacket> CODEC = StreamCodec.of(
+        (buf, pkt) -> {
+            buf.writeVarInt(pkt.itemSlot());
+            buf.writeVarInt(pkt.pageIdx());
+            buf.writeVarInt(pkt.slotIdx());
+            buf.writeUtf(pkt.stat().name());
+            buf.writeVarInt(pkt.delta());
+            buf.writeBoolean(pkt.isBank());
+        },
+        buf -> {
+            int itemSlot = buf.readVarInt();
+            int pageIdx = buf.readVarInt();
+            int slotIdx = buf.readVarInt();
+            String statName = buf.readUtf(64);
+            int delta = buf.readVarInt();
+            boolean isBank = buf.readBoolean();
+
+            Stat stat;
+            int safeDelta = Math.max(-20, Math.min(20, delta));
+            try { stat = Stat.valueOf(statName); }
+            catch (IllegalArgumentException e) { stat = Stat.DAMAGE; safeDelta = 0; }
+            return new AllocatePointPacket(itemSlot, pageIdx, slotIdx, stat, safeDelta, isBank);
+        }
+    );
+
+    @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+
+    public static void handle(AllocatePointPacket pkt, IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
+            ItemStack stack;
+            if (ctx.player().containerMenu instanceof GlyphWorkbenchMenu menu) {
+                stack = menu.getGrimoire();
+            } else {
+                int slot = pkt.itemSlot();
+                if (slot < 0 || slot >= ctx.player().getInventory().getContainerSize()) return;
+                stack = ctx.player().getInventory().getItem(slot);
+            }
+
+            if (stack.getItem() instanceof GrimoireItem) {
+                if (pkt.isBank()) {
+                    GrimoireData.allocatePointToBank(stack, pkt.slotIdx(), pkt.stat(), pkt.delta());
+                } else {
+                    GrimoireData.allocatePoint(stack, pkt.pageIdx(), pkt.slotIdx(), pkt.stat(), pkt.delta());
+                }
+                ctx.player().containerMenu.broadcastChanges();
+            }
+        });
+    }
+}
+
+----- src/main/java/com/example/grimoiremod/network/GrimoireActionPacket.java -----
+package com.example.grimoiremod.network;
+
+import com.example.grimoiremod.data.GlyphPage;
+import com.example.grimoiremod.data.GrimoireData;
+import com.example.grimoiremod.glyphs.Stat;
+import com.example.grimoiremod.item.GrimoireItem;
+import com.example.grimoiremod.menu.GlyphWorkbenchMenu;
+import io.netty.handler.codec.DecoderException;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.network.handling.IPayloadContext;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public record GrimoireActionPacket(int itemSlot, String action, int[] ints, String[] strings)
+        implements CustomPacketPayload {
+
+    private static final int MAX_INTS = 32;
+    private static final int MAX_STRINGS = 16;
+    private static final int MAX_STR_LEN = 256;
+
+    public static final Type<GrimoireActionPacket> TYPE =
+            new Type<>(ResourceLocation.fromNamespaceAndPath("grimoiremod", "grimoire_action"));
+
+    public static final StreamCodec<FriendlyByteBuf, GrimoireActionPacket> CODEC = StreamCodec.of(
+        (buf, pkt) -> {
+            buf.writeVarInt(pkt.itemSlot());
+            buf.writeUtf(pkt.action());
+            buf.writeVarInt(pkt.ints().length);
+            for (int i : pkt.ints()) buf.writeVarInt(i);
+            buf.writeVarInt(pkt.strings().length);
+            for (String s : pkt.strings()) buf.writeUtf(s);
+        },
+        buf -> {
+            int itemSlot = buf.readVarInt();
+            String action = buf.readUtf(32);
+            int intCount = buf.readVarInt();
+            if (intCount < 0 || intCount > MAX_INTS) throw new DecoderException("Invalid int count");
+            int[] ints = new int[intCount];
+            for (int i = 0; i < intCount; i++) ints[i] = buf.readVarInt();
+            int strCount = buf.readVarInt();
+            if (strCount < 0 || strCount > MAX_STRINGS) throw new DecoderException("Invalid string count");
+            String[] strings = new String[strCount];
+            for (int i = 0; i < strCount; i++) strings[i] = buf.readUtf(MAX_STR_LEN);
+            return new GrimoireActionPacket(itemSlot, action, ints, strings);
+        }
+    );
+
+    @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+
+    public static GrimoireActionPacket setPage(int slot, int page) {
+        return new GrimoireActionPacket(slot, "setPage", new int[]{page}, new String[0]);
+    }
+    public static GrimoireActionPacket switchPage(int slot, boolean next) {
+        return new GrimoireActionPacket(slot, "switchPage", new int[]{next ? 1 : 0}, new String[0]);
+    }
+    public static GrimoireActionPacket placeGlyph(int slot, int page, int row, String typeId, Map<Stat, Integer> allocs) {
+        StringBuilder sb = new StringBuilder();
+        for (var e : allocs.entrySet()) {
+            if (sb.length() > 0) sb.append(",");
+            sb.append(e.getKey().name()).append(":").append(e.getValue());
+        }
+        return new GrimoireActionPacket(slot, "placeGlyph", new int[]{page, row}, new String[]{typeId, sb.toString()});
+    }
+    public static GrimoireActionPacket moveGlyph(int slot, int page, int fromRow, int toRow) {
+        return new GrimoireActionPacket(slot, "moveGlyph", new int[]{page, fromRow, toRow}, new String[0]);
+    }
+    public static GrimoireActionPacket removeGlyph(int slot, int page, int row) {
+        return new GrimoireActionPacket(slot, "removeGlyph", new int[]{page, row}, new String[0]);
+    }
+    public static GrimoireActionPacket setName(int slot, int page, String name) {
+        return new GrimoireActionPacket(slot, "setName", new int[]{page},
+                new String[]{name == null ? "" : name});
+    }
+    public static GrimoireActionPacket setFavorite(int slot, int page, boolean fav) {
+        return new GrimoireActionPacket(slot, "setFavorite", new int[]{page, fav ? 1 : 0}, new String[0]);
+    }
+    public static GrimoireActionPacket movePage(int slot, int from, int to) {
+        return new GrimoireActionPacket(slot, "movePage", new int[]{from, to}, new String[0]);
+    }
+    public static GrimoireActionPacket resetGlyph(int slot, int page, int slotIdx) {
+        return new GrimoireActionPacket(slot, "resetGlyph", new int[]{page, slotIdx}, new String[0]);
+    }
+    public static GrimoireActionPacket resetGlyphInBank(int slot, int bankIdx) {
+        return new GrimoireActionPacket(slot, "resetGlyphInBank", new int[]{bankIdx}, new String[0]);
+    }
+
+    public static void handle(GrimoireActionPacket pkt, IPayloadContext ctx) {

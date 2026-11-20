@@ -1,0 +1,46 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.gradle.userdev' version '7.1.21'
+}
+
+version = '1.0.0'
+group = 'com.example.grimoiremod'
+base { archivesName = 'grimoiremod' }
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+runs {
+    client {
+        systemProperty 'neoforge.enabledGameTestNamespaces', 'grimoiremod'
+        // Явно задаём ignoreList для BootstrapLauncher
+        systemProperties.put('ignoreList',
+            'bootstraplauncher,securejarhandler,asm-commons,asm-util,asm-analysis,asm-tree,asm,JarJarFileSystems,client-extra,fmlcore,javafmllanguage')
+    }
+    server {
+        systemProperty 'neoforge.enabledGameTestNamespaces', 'grimoiremod'
+        systemProperties.put('ignoreList',
+            'bootstraplauncher,securejarhandler,asm-commons,asm-util,asm-analysis,asm-tree,asm,JarJarFileSystems,client-extra,fmlcore,javafmllanguage')
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url = 'https://neoforged.forgecdn.net/releases' } // Зеркало NeoForged
+    maven { url = 'https://repo.spongepowered.org/repository/forge-proxy/' } // Для groovydslimprover
+    maven { url = 'https://maven.neoforged.net/releases' } // Официальный (на случай, если заработает)
+}
+
+dependencies {
+    implementation "net.neoforged:neoforge:21.1.218"
+}
+
+['compileClasspath', 'runtimeClasspath', 'testCompileClasspath', 'testRuntimeClasspath'].each { configName ->
+    configurations.named(configName) {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.ow2.asm') {
+                details.useVersion '9.8'
+            }
+        }
+    }
+}

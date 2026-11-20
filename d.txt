@@ -1,0 +1,282 @@
+
+=================== PROJECT STRUCTURE ===================
+./.gitignore
+./AI_CONTEXT.md
+./build.gradle
+./gradle.properties
+./gradle/wrapper/gradle-wrapper.properties
+./project_dump.txt
+./README.md
+./settings.gradle
+./src/main/java/com/example/grimoiremod/block/GlyphWorkbenchBlock.java
+./src/main/java/com/example/grimoiremod/client/ClientEvents.java
+./src/main/java/com/example/grimoiremod/client/ClientGlyphIcons.java
+./src/main/java/com/example/grimoiremod/client/ClientModEvents.java
+./src/main/java/com/example/grimoiremod/client/GlyphWorkbenchScreen.java
+./src/main/java/com/example/grimoiremod/client/GrimoireScreen.java
+./src/main/java/com/example/grimoiremod/client/KeyBindings.java
+./src/main/java/com/example/grimoiremod/client/SkillTreeScreen.java
+./src/main/java/com/example/grimoiremod/client/SpellProjectileRenderer.java
+./src/main/java/com/example/grimoiremod/data/GlyphInstance.java
+./src/main/java/com/example/grimoiremod/data/GlyphPage.java
+./src/main/java/com/example/grimoiremod/data/GrimoireData.java
+./src/main/java/com/example/grimoiremod/data/SkillTreeData.java
+./src/main/java/com/example/grimoiremod/data/SkillTreeDef.java
+./src/main/java/com/example/grimoiremod/data/SpellDescriber.java
+./src/main/java/com/example/grimoiremod/data/SpellParser.java
+./src/main/java/com/example/grimoiremod/entity/SpellProjectile.java
+./src/main/java/com/example/grimoiremod/glyphs/Glyph.java
+./src/main/java/com/example/grimoiremod/glyphs/GlyphBalance.java
+./src/main/java/com/example/grimoiremod/glyphs/GlyphCategory.java
+./src/main/java/com/example/grimoiremod/glyphs/Glyphs.java
+./src/main/java/com/example/grimoiremod/glyphs/GlyphStatRules.java
+./src/main/java/com/example/grimoiremod/glyphs/GrimoireEffects.java
+./src/main/java/com/example/grimoiremod/glyphs/Phase.java
+./src/main/java/com/example/grimoiremod/glyphs/SpellAggregator.java
+./src/main/java/com/example/grimoiremod/glyphs/SpellRules.java
+./src/main/java/com/example/grimoiremod/glyphs/Stat.java
+./src/main/java/com/example/grimoiremod/glyphs/StatBlock.java
+./src/main/java/com/example/grimoiremod/glyphs/StatMod.java
+./src/main/java/com/example/grimoiremod/glyphs/WetEffect.java
+./src/main/java/com/example/grimoiremod/GrimoireCommand.java
+./src/main/java/com/example/grimoiremod/GrimoireMod.java
+./src/main/java/com/example/grimoiremod/item/CreativeGrimoireItem.java
+./src/main/java/com/example/grimoiremod/item/CreativeGrimoireRegistration.java
+./src/main/java/com/example/grimoiremod/item/GrimoireItem.java
+./src/main/java/com/example/grimoiremod/menu/GlyphWorkbenchMenu.java
+./src/main/java/com/example/grimoiremod/ModEvents.java
+./src/main/java/com/example/grimoiremod/network/AllocatePointPacket.java
+./src/main/java/com/example/grimoiremod/network/GrimoireActionPacket.java
+./src/main/java/com/example/grimoiremod/network/ModNetwork.java
+./src/main/java/com/example/grimoiremod/network/UnlockSkillNodePacket.java
+./src/main/java/com/example/grimoiremod/util/.gitkeep
+./src/main/resources/assets/grimoiremod/lang/en_us.json
+./src/main/resources/assets/grimoiremod/lang/ru_ru.json
+./src/main/resources/assets/grimoiremod/models/item/creative_grimoire.json
+./src/main/resources/assets/grimoiremod/models/item/grimoire.json
+./src/main/resources/data/grimoiremod/skill_trees/main.json
+./src/main/resources/META-INF/neoforge.mods.toml
+./src/main/resources/pack.mcmeta
+
+=================== GRADLE / CONFIG ===================
+
+----- build.gradle -----
+plugins {
+    id 'java'
+    id 'net.neoforged.gradle.userdev' version '7.1.21'
+}
+
+version = '1.0.0'
+group = 'com.example.grimoiremod'
+base { archivesName = 'grimoiremod' }
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+runs {
+    client {
+        systemProperty 'neoforge.enabledGameTestNamespaces', 'grimoiremod'
+        // Явно задаём ignoreList для BootstrapLauncher
+        systemProperties.put('ignoreList',
+            'bootstraplauncher,securejarhandler,asm-commons,asm-util,asm-analysis,asm-tree,asm,JarJarFileSystems,client-extra,fmlcore,javafmllanguage')
+    }
+    server {
+        systemProperty 'neoforge.enabledGameTestNamespaces', 'grimoiremod'
+        systemProperties.put('ignoreList',
+            'bootstraplauncher,securejarhandler,asm-commons,asm-util,asm-analysis,asm-tree,asm,JarJarFileSystems,client-extra,fmlcore,javafmllanguage')
+    }
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url = 'https://neoforged.forgecdn.net/releases' } // Зеркало NeoForged
+    maven { url = 'https://repo.spongepowered.org/repository/forge-proxy/' } // Для groovydslimprover
+    maven { url = 'https://maven.neoforged.net/releases' } // Официальный (на случай, если заработает)
+}
+
+dependencies {
+    implementation "net.neoforged:neoforge:21.1.218"
+}
+
+['compileClasspath', 'runtimeClasspath', 'testCompileClasspath', 'testRuntimeClasspath'].each { configName ->
+    configurations.named(configName) {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.ow2.asm') {
+                details.useVersion '9.8'
+            }
+        }
+    }
+}
+----- settings.gradle -----
+pluginManagement {
+    repositories {
+        mavenLocal()
+        gradlePluginPortal()
+        maven { url = 'https://maven.neoforged.net/releases' }
+    }
+}
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+rootProject.name = 'grimoiremod'
+
+----- gradle.properties -----
+org.gradle.jvmargs=-Xmx2G
+
+----- gradle/wrapper/gradle-wrapper.properties -----
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.14.4-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+
+=================== RESOURCES (без ассет-мусора; lang keep=en_us) ===================
+
+----- src/main/resources/assets/grimoiremod/lang/en_us.json -----
+{
+  "item.grimoiremod.grimoire": "Grimoire",
+  "block.grimoiremod.glyph_workbench": "Glyph Workbench",
+  "item.grimoiremod.glyph_workbench": "Glyph Workbench",
+  "item.grimoiremod.creative_grimoire": "Creative Grimoire",
+  
+  "key.grimoiremod.prev": "Previous Spell",
+  "key.grimoiremod.next": "Next Spell",
+  "key.grimoiremod.skill_tree": "Open Skill Tree",
+  "key.categories.grimoiremod": "Grimoire",
+  
+  "effect.grimoiremod.wet": "Wet",
+  
+  "gui.grimoiremod.grimoire": "Grimoire",
+  "gui.grimoiremod.workbench": "Glyph Workbench",
+  "gui.grimoiremod.toc": "Table of Contents",
+  "gui.grimoiremod.bank": "Glyph Bank",
+  "gui.grimoiremod.bank_prefix": "[Bank] ",
+  "gui.grimoiremod.spell": "Spell %s",
+  "gui.grimoiremod.result": "Result:",
+  "gui.grimoiremod.no_form": "(no form)",
+  "gui.grimoiremod.no_glyphs": "No glyphs of this type",
+  "gui.grimoiremod.select_glyph": "Select a glyph",
+  "gui.grimoiremod.reset": "Reset",
+  "gui.grimoiremod.points": "Points: %s",
+  "gui.grimoiremod.points_spent": "  Points spent: %s",
+  "gui.grimoiremod.no_stats": "  (no stats)",
+  "gui.grimoiremod.grimoire_not_found": "Grimoire not found!",
+  "gui.grimoiremod.right_click_remove": "%s (RMB - remove)",
+  "gui.grimoiremod.budget_exhausted": "Budget exhausted for this stat",
+  "gui.grimoiremod.advanced": "[Advanced] %s",
+  "gui.grimoiremod.orphan_modifier": "⚠ Modifier without element",
+  "gui.grimoiremod.need_grimoire": "Grimoire required!",
+  "gui.grimoiremod.drag_hint": "Hold and drag to move",
+  "gui.grimoiremod.drop_hint": "Release to drop",
+  "gui.grimoiremod.name": "Name",
+  
+  "gui.grimoiremod.damage": "%s damage",
+  "gui.grimoiremod.heal": "+%s heal",
+  "gui.grimoiremod.form": "Form: %s",
+  "gui.grimoiremod.crit_chance": "Crit chance: +%s%%",
+  "gui.grimoiremod.crit_damage": "Crit damage: +%s%%",
+  "gui.grimoiremod.cooldown": "Cooldown: %ss",
+  
+  "gui.grimoiremod.tab.all": "All",
+  "gui.grimoiremod.tab.forms": "Forms",
+  "gui.grimoiremod.tab.elements": "Elements",
+  "gui.grimoiremod.tab.effects": "Effects",
+  "gui.grimoiremod.tab.modifiers": "Modifiers",
+  "gui.grimoiremod.tab.form_mods": "Form Mods",
+  "gui.grimoiremod.tab.all_short": "All",
+  "gui.grimoiremod.tab.forms_short": "Fm",
+  "gui.grimoiremod.tab.elements_short": "El",
+  "gui.grimoiremod.tab.effects_short": "Ef",
+  "gui.grimoiremod.tab.modifiers_short": "Md",
+  "gui.grimoiremod.tab.form_mods_short": "F+",
+
+  "gui.grimoiremod.error.no_form": "No form",
+  "gui.grimoiremod.error.multiple_forms": "Multiple forms (only first used)",
+  "gui.grimoiremod.error.multiple_elements": "Multiple elements (only first used)",
+  "gui.grimoiremod.error.duplicate_effect": "Duplicate effect (ignored)",
+  "gui.grimoiremod.error.orphan_modifier": "Modifier without an anchor",
+
+  "glyph.grimoiremod.projectile": "Projectile",
+  "glyph.grimoiremod.self": "Self",
+  "glyph.grimoiremod.touch": "Touch",
+  "glyph.grimoiremod.fire": "Fire",
+  "glyph.grimoiremod.ice": "Ice",
+  "glyph.grimoiremod.water": "Water",
+  "glyph.grimoiremod.heal": "Heal",
+  "glyph.grimoiremod.speed": "Speed",
+  "glyph.grimoiremod.slow": "Slow",
+  "glyph.grimoiremod.bigger": "Bigger",
+  "glyph.grimoiremod.split": "Split",
+  "glyph.grimoiremod.focus": "Focus",
+  "glyph.grimoiremod.spread": "Spread",
+  "glyph.grimoiremod.fireball": "Fireball",
+
+  "stat.grimoiremod.fallback_damage": "Damage",
+  "stat.grimoiremod.crit_chance": "Crit Chance",
+  "stat.grimoiremod.crit_mult": "Crit Damage",
+  "stat.grimoiremod.cooldown": "Cooldown",
+  "stat.grimoiremod.count": "Count",
+  "stat.grimoiremod.angle": "Angle",
+  "stat.grimoiremod.life": "Range",
+  "stat.grimoiremod.damage_bonus": "Damage Bonus",
+  "stat.grimoiremod.damage": "Damage",
+  "stat.grimoiremod.heal": "Heal",
+  "stat.grimoiremod.duration": "Duration",
+  
+  "gui.grimoiremod.skill_tree.title": "Skill Tree",
+  "gui.grimoiremod.skill_tree.main": "Path of the Grimoire",
+  "gui.grimoiremod.skill_tree.points": "Mastery Points: %s",
+  "gui.grimoiremod.skill_tree.unlock": "Click to unlock",
+  "gui.grimoiremod.skill_tree.locked": "Locked",
+  "gui.grimoiremod.skill_tree.unlocked": "Unlocked",
+  "gui.grimoiremod.skill_tree.no_points": "Not enough points",
+  "gui.grimoiremod.skill_tree.prereq": "Requires: %s",
+  "gui.grimoiremod.skill_tree.cost": "Cost: %s point(s)",
+  
+  "gui.grimoiremod.skill.magic_basics": "Basics of Magic"
+}
+
+----- src/main/resources/data/grimoiremod/skill_trees/main.json -----
+{
+  "id": "grimoiremod:main",
+  "display_name": "gui.grimoiremod.skill_tree.main",
+  "nodes": [
+    { "id": "grimoiremod:magic_basics", "name": "gui.grimoiremod.skill.magic_basics",
+      "x": 0, "y": 0, "cost": 0, "prerequisites": [], "effects": [] }
+  ]
+}
+
+----- src/main/resources/META-INF/neoforge.mods.toml -----
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="grimoiremod"
+version="1.0.0"
+displayName="Grimoire Mod"
+description="Adds the Grimoire item with a spell system."
+
+[[dependencies.grimoiremod]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.1.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.grimoiremod]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.1]"
+    ordering="NONE"
+    side="BOTH"
+
+----- src/main/resources/pack.mcmeta -----
+{
+  "pack": {
+    "description": "grimoiremod resources",
+    "pack_format": 34
+  }
+}
